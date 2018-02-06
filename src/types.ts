@@ -1,5 +1,5 @@
 
-export type TopologyTerminal = 'bool' | 'int' | 'number' | 'date'
+export type TopologyTerminal = 'bool' | 'int' | 'number' | 'date' | 'blob' | 'string'
 
 export type Topology =
   TopologyTerminal | {[name: string]: Topology}
