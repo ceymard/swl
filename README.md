@@ -24,6 +24,12 @@ csv://pouet.csv
 
 ---
 
+postgres://app:app@1.1.1.1/app users | targets | user_targets
+  :: rename users:user, targets:taaarget
+  :: sqlite://file.db
+
+---
+
 csv://pouet2.csv
   :: after_table create index on pouet2(id, date)
   :: sqlite://:tmp?autocreate
@@ -31,7 +37,7 @@ csv://pouet2.csv
 ;;
 
 sqlite://:tmp
-  select p1.*, p2.* from pouet p1 inner join pouet2 p2 on p1.id = p2.source_id as zobi
+  zobi:'select p1.*, p2.* from pouet p1 inner join pouet2 p2 on p1.id = p2.source_id'
   :: upsert on id
   :: postgres://app:app@1.1.1.1/app?autocreate
 
@@ -41,7 +47,7 @@ sqlite://myfile.db users | targets | user_targets
   :: [ collection == users ? before_collection delete from haha where date <= current_date ]
   :: postgres://app:app@1.1.1.1/app
 
-xlsx://haha.xlsx?sanitize_names
+xlsx://haha.xlsx?sanitize_names,doit
 
 json://mydata {a: 1, b:2} {a: 2, b: 3} {a: 5, b: 6}
 

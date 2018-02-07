@@ -1,18 +1,31 @@
 
 export type TopologyTerminal = 'bool' | 'int' | 'number' | 'date' | 'blob' | 'string'
+export type TopologyObj = TopologyTerminal | {[name: string]: Topology}
 
 export type Topology =
-  TopologyTerminal | {[name: string]: Topology}
+  TopologyObj | TopologyObj[]
 
 /**
  * Records are the objects that flow within our system
  */
-export interface Record {
-  collection: string
-  topology: Topology
-  fields: any
+export class Data {
+  constructor(
+    public collection: string,
+    public topology: Topology,
+    public data: any
+  ) {
+
+  }
 }
 
-export interface Event {
 
+/**
+ * Events flow alongside data in the pipes.
+ */
+export class Event {
+  constructor(
+    public type: string
+  ) {
+
+  }
 }
