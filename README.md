@@ -18,24 +18,44 @@ swl sqlite://myfile.db :: all_tables :: stdout
 ```
 swl <<EOF
 
-# table is named "pouet"
-csv://pouet.csv
-  :: sqlite://:tmp?autocreate
+xlsx://CALL_NEPHRO_2018?sanitize visites
+  :: on-start source.runSomeMethod?arg1:toto
+  :: on-start exec create view visits as ...
+  :: on-end exec commit
+  :: on-end exec create index if not exists zobi on users(id, date)
+  [ if table == 'users' :: rename 'userss' :: on-end exec vacuum users ]
+  :: guess_types
+  :: flatten
+  :: sqlite://import.db?overwrite
 
 ---
 
-postgres://app:app@1.1.1.1/app users | targets | user_targets
+# Enfin, on loade le résultat de cet import dans la base de données
+sqlite://import.db visits
+:: postgres://app:app@postgres/app
+
+---
+
+# table is named "pouet"
+csv://pouet.csv
+  :: sqlite://:tmp?truncate
+
+---
+
+postgres://app:app@1.1.1.1/app users,targets,user_targets
   :: rename users:user, targets:taaarget
   :: sqlite://file.db
 
 ---
 
-csv://pouet2.csv
-  :: after_table create index on pouet2(id, date)
+csv://pouet2.csv?delimiter:';',escape:'"'
+  :: on-collection-start
+  :: run-sink create index on pouet2(id, date)
   :: sqlite://:tmp?autocreate
 
 ;;
 
+# Va insérer le résultat de la requête dans
 sqlite://:tmp
   zobi:'select p1.*, p2.* from pouet p1 inner join pouet2 p2 on p1.id = p2.source_id'
   :: upsert on id
