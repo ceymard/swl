@@ -6,6 +6,7 @@
   },
   "dependencies": {
     "@types/highland": "^2.10.6",
-    "parjs": "^0.7.0"
+    "@types/parsimmon": "^1.6.1",
+    "parsimmon": "^1.6.4"
   }
 }

@@ -1,5 +1,19 @@
 #!/usr/bin/env node
-// import {parse} from 'swl/oparse'
+import {PARSER} from './oparse'
 
-console.log('!!')
-console.log(('flag1,!flag2,prop:value,prop2:(sub_prop:2,sub_array:[1,2,true,yes,hello]),prop3:2018-05-02T13:01:00,prop4:2018-01-01'))
+console.log(PARSER.parse(`
+  nocaca
+
+  nozop,
+  ab,
+  !acb,
+  abc: pouet,
+  aaa:  true  ,
+  h: [1, 2, 3,  false ],
+  zob:(a: 1, b: 2),
+  toto: 12,
+  d: 2018-01-01 01:01:59
+
+
+  source1: 'SELECT zobi'
+`))
