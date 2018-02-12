@@ -1,7 +1,11 @@
 {
   "name": "swl",
   "version": "0.0.1",
+  "bin": {
+    "swl": "lib/swl.js"
+  },
   "dependencies": {
-    "@types/highland": "^2.10.6"
+    "@types/highland": "^2.10.6",
+    "parjs": "^0.7.0"
   }
 }

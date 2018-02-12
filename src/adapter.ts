@@ -5,7 +5,7 @@
  */
 export class Adapter {
 
-  open(options: any, body: any) {
+  constructor(options: any, body: any) {
 
   }
 }
