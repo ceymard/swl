@@ -9,15 +9,9 @@ function S(t: TemplateStringsArray) {
 const R = P.regexp
 
 
-const date_reg = /^\s*(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?\s*$/
+const re_date = /(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?/
 const re_number = /^\s*-?\d+(\.\d+)?\s*$/
 const SINGLE_VALUE = R(/[^,\}\]\s]+/).map(res => {
-  const date_match = date_reg.exec(res)
-  if (date_match) {
-    const [_, year, month, day, hh, mm, ss] = date_match
-    return new Date(i(year), i(month) - 1, i(day), i(hh)||0, i(mm)||0, i(ss)||0)
-  }
-
   const num = re_number.exec(res)
   if (num) {
     return parseFloat(num[0])
@@ -36,11 +30,18 @@ const REGEXP = R(re_regexp).map(r => {
   return new RegExp(src, flags||'')
 })
 
+const DATE = R(re_date).map(r => {
+  const [_, year, month, day, hh, mm, ss] = re_date.exec(r)!
+  return new Date(i(year), i(month) - 1, i(day), i(hh)||0, i(mm)||0, i(ss)||0)
+
+})
+
 const VALUE: P.Parser<any> = P.alt(
   P.seqMap(S`[`, P.sepBy(P.lazy(() => VALUE), S`,`), S`]`, (_1, res, _2) => res),
   P.seqMap(S`{`, P.lazy(() => OBJECT), S`}`, (_1, res, _2) => res),
   TRUE,
   FALSE,
+  DATE,
   QUOTED,
   REGEXP,
   SINGLE_VALUE
