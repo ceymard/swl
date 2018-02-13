@@ -1,7 +1,8 @@
 import * as P from 'parsimmon'
 
 const i = parseInt
-const date_reg = /(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?/
+const date_reg = /^\s*(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?\s*$/
+const re_number = /^\s*-?\d+(\.\d+)?\s*$/
 
 function S(t: TemplateStringsArray) {
   return P.seqMap(P.optWhitespace, P.string(t.join('')), P.optWhitespace, (_1, res, _2) => res)
@@ -10,33 +11,42 @@ function S(t: TemplateStringsArray) {
 const R = P.regexp
 
 
-const DATE = R(date_reg)
-  .map(res => {
-    const [_, year, month, day, hh, mm, ss] = date_reg.exec(res)!
-    console.log(year)
+const IDENT = R(/[^,\}\]\s]+/).map(res => {
+  const date_match = date_reg.exec(res)
+  if (date_match) {
+    const [_, year, month, day, hh, mm, ss] = date_match
     return new Date(i(year), i(month) - 1, i(day), i(hh)||0, i(mm)||0, i(ss)||0)
-  })
+  }
 
-////////////////////////////////////////////////
+  const num = re_number.exec(res)
+  if (num) {
+    return parseFloat(num[0])
+  }
 
-const STR = R(/'[^']*'|"[^"]*"|[^,\)\]]+/)
+  return res
+})
+
+const QUOTED = R(/'[^']*'|"[^"]*"|`[^`]*`/).map(res => res.slice(1, -1))
 const TRUE = P.alt(S`true`, S`yes`).map(_ => true)
 const FALSE = P.alt(S`false`, S`no`).map(_ => false)
-const NUMBER = R(/\d+(\.\d+)?/).map(Number)
 
 const VALUE: P.Parser<any> = P.alt(
   P.seqMap(S`[`, P.sepBy(P.lazy(() => VALUE), S`,`), S`]`, (_1, res, _2) => res),
-  P.seqMap(S`(`, P.lazy(() => OBJECT), S`)`, (_1, res, _2) => res),
-  DATE,
+  P.seqMap(S`{`, P.lazy(() => OBJECT), S`}`, (_1, res, _2) => res),
   TRUE,
   FALSE,
-  NUMBER,
-  STR,
+  QUOTED,
+  IDENT
 )
 
 const BOOL_PROP = P.seqMap(
-  P.alt(S`no`, S`!`, S`dont`, S``),
-  R(/\w+/),
+  P.alt(
+    P.seq(P.optWhitespace, R(/not?\s+/)),
+    S`!`,
+    P.seq(P.optWhitespace, R(/don'?t\s+/)),
+    S``
+  ),
+  R(/[^,\)\]\s]+/),
   (no, val) => { return {[val]: !no} }
 )
 
