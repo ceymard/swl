@@ -7,7 +7,8 @@ const res = PARSER.parse(`
   folder: Amgen/Pouet,
   user: incoming@salesway.eu,
   password: 1nc0m1ng_,
-  files: [./c, /home/chris],
+  reg: r'.*[^]+'i,
+  files: [./c, /home/chris, /rtort*],
 
 no zop,
 not dope-there,

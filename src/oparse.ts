@@ -1,8 +1,6 @@
 import * as P from 'parsimmon'
 
 const i = parseInt
-const date_reg = /^\s*(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?\s*$/
-const re_number = /^\s*-?\d+(\.\d+)?\s*$/
 
 function S(t: TemplateStringsArray) {
   return P.seqMap(P.optWhitespace, P.string(t.join('')), P.optWhitespace, (_1, res, _2) => res)
@@ -11,7 +9,9 @@ function S(t: TemplateStringsArray) {
 const R = P.regexp
 
 
-const IDENT = R(/[^,\}\]\s]+/).map(res => {
+const date_reg = /^\s*(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?\s*$/
+const re_number = /^\s*-?\d+(\.\d+)?\s*$/
+const SINGLE_VALUE = R(/[^,\}\]\s]+/).map(res => {
   const date_match = date_reg.exec(res)
   if (date_match) {
     const [_, year, month, day, hh, mm, ss] = date_match
@@ -26,9 +26,15 @@ const IDENT = R(/[^,\}\]\s]+/).map(res => {
   return res
 })
 
-const QUOTED = R(/'[^']*'|"[^"]*"|`[^`]*`/).map(res => res.slice(1, -1))
+const re_regexp = /r'([^']+)'([imguy]*)/
+
+const QUOTED = R(/'[^']*'|"[^"]*"/).map(res => res.slice(1, -1))
 const TRUE = P.alt(S`true`, S`yes`).map(_ => true)
 const FALSE = P.alt(S`false`, S`no`).map(_ => false)
+const REGEXP = R(re_regexp).map(r => {
+  const [_, src, flags] = re_regexp.exec(r)!
+  return new RegExp(src, flags||'')
+})
 
 const VALUE: P.Parser<any> = P.alt(
   P.seqMap(S`[`, P.sepBy(P.lazy(() => VALUE), S`,`), S`]`, (_1, res, _2) => res),
@@ -36,7 +42,8 @@ const VALUE: P.Parser<any> = P.alt(
   TRUE,
   FALSE,
   QUOTED,
-  IDENT
+  REGEXP,
+  SINGLE_VALUE
 )
 
 const BOOL_PROP = P.seqMap(
