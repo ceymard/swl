@@ -9,7 +9,11 @@ const DIVIDER = P.regex(/\s*\|\s*/)
 const LBRACKET = P.regex(/\s*\[\s*/)
 const RBRACKET = P.regex(/\s*]\s*/)
 
-const INSTRUCTION = P.regex(/([^\[\]\|]+)/)
+const SINGLE = P.regex(/[^\?]+\?/)
+
+const INSTRUCTION = P.regex(/([^\[\]\|]+)/).map(s => {
+  return s.trim()
+})
 
 const INSTR = P.alt(
   P.seqMap(LBRACKET, P.lazy(() => PIPE), RBRACKET, (_1, res, _2) => res),

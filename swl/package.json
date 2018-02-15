@@ -1,0 +1,12 @@
+{
+  "name": "swl",
+  "version": "0.0.1",
+  "bin": {
+    "swl": "lib/swl.js"
+  },
+  "dependencies": {
+    "@types/highland": "^2.10.6",
+    "@types/parsimmon": "^1.6.1",
+    "parsimmon": "^1.6.4"
+  }
+}
