@@ -1,5 +1,4 @@
-import {Adapter} from './adapter'
-import {Chunk} from '../types'
+import {Adapter, Chunk} from './adapter'
 
 export class LoggerAdapter extends Adapter {
 
