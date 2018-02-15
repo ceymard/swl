@@ -1,33 +1,64 @@
-import {Adapter} from './adapter'
+import {Adapter, CollectionStartPayload} from './adapter'
 import {basename} from 'path'
 import {createWriteStream, WriteStream} from 'fs'
-import {promisify} from 'util'
+
 
 export interface JsonAdapterOptions {
-  name: string
+  beautify?: boolean
+  object?: boolean
 }
 
-export class JsonAdapter extends Adapter {
+export class JsonAdapter extends Adapter<JsonAdapterOptions> {
 
   done = false
+  first = true
   is_source = !!this.body
   file: WriteStream | null = !this.is_source ? createWriteStream(this.uri, {flags: 'w', encoding: 'utf-8'}) : null
 
-  async onUpstreamFinished(): Promise<null | void> {
-    this._read()
-    return null
-  }
+  beautify = !!this.options.beautify
+  as_object = !!this.options.object
 
-  async onChunk(chunk: any) {
-    if (this.file) {
-      const wr = this.file.write.bind(this.file)
-      await promisify(wr)(JSON.stringify(chunk))
+  async onUpstreamFinished(): Promise<null | void> {
+    if (this.is_source) {
+      this._read()
+      return null
+    } else {
+      this.output(']\n')
     }
   }
 
-  _read() {
+  async onCollectionStart(payload: CollectionStartPayload) {
+    if (!this.is_source && this.as_object) {
+      this.output(`"${payload.name}": [`)
+    }
+  }
 
-    if (this.is_speaking && this.is_source && !this.done) {
+  async onCollectionEnd() {
+    if (!this.is_source && this.as_object) {
+      this.output(']')
+    }
+  }
+
+  async onChunk(chunk: any) {
+    if (!this.is_source) {
+      if (this.first) {
+        this.first = false
+        this.as_object ? this.output('{') : this.output('[')
+      } else {
+        this.output(this.beautify ? ',\n' : ',')
+      }
+      this.output(JSON.stringify(chunk, null, this.beautify ? '  ' : ''))
+      return null
+    }
+  }
+
+  output(data: any) {
+    if (!this.file) return
+    this.writeOther(this.file, data)
+  }
+
+  __read() {
+    if (!this.done) {
       const collection = basename(this.uri)
       this.done = true
       const bod = JSON.parse(`[${this.body}]`)
@@ -44,3 +75,7 @@ export class JsonAdapter extends Adapter {
   }
 
 }
+
+JsonAdapter
+  .register('json')
+  .registerMime('application/json')

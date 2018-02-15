@@ -21,17 +21,42 @@ export interface Chunk {
 }
 
 
+export interface AdapterCreator {
+  new (uri: string, options: any, body: string): Adapter<any>
+}
+
+export const registry: {
+  [name: string]: AdapterCreator
+} = {}
+
+export const mime_registry: {
+  [name: string]: AdapterCreator
+} = {}
+
 /**
  *
  */
-export abstract class Adapter extends Duplex {
+export abstract class Adapter<O extends Object> extends Duplex {
 
   public is_speaking = false
   public is_source = false
 
-  static pipeline(readable: Adapter, ...rest: Adapter[]) {
+  static register(...uri: string[]) {
+    for (var u of uri)
+      registry[u] = this as any
+    return this
+  }
+
+  static registerMime(...mimes: string[]) {
+    for (var u of mimes)
+      mime_registry[u] = this as any
+    return this
+  }
+
+  static pipeline(...rest: Adapter<any>[]) {
     // var first = readable
-    var iter: Adapter = readable
+    var iter: Adapter<any> = rest[0]
+    rest = rest.slice(1)
     iter.is_speaking = true
 
     for (var r of rest) {
@@ -40,7 +65,7 @@ export abstract class Adapter extends Duplex {
     }
   }
 
-  constructor(public uri: string, public options: any = {}, public body: string = '') {
+  constructor(public uri: string, public options: O = {} as any, public body: string = '') {
     super({objectMode: true})
   }
 
@@ -85,7 +110,7 @@ export abstract class Adapter extends Duplex {
 
   }
 
-  async onChunk(payload: any) {
+  async onChunk(payload: any): Promise<null | any> {
 
   }
 
@@ -96,28 +121,32 @@ export abstract class Adapter extends Duplex {
     callback()
   }
 
-  async writeOther(data: any, writable: Writable) {
+  async writeOther(writable: Writable, data: any) {
     return new Promise((done) => {
-      function _write() {
-        var ok = writable.write(data)
-        if (!ok) {
-          writable.once('drain', _write)
-        } else {
-          done()
-        }
-      }
-      _write()
+      if (!writable.write(data))
+        writable.once('drain', done)
+      else done()
     })
   }
 
+  /**
+   * An even more private version of _read !
+  */
+  __read() {
+
+  }
 
   _read() {
+    if (this.is_speaking && this.is_source) {
+
+      this.__read()
+    }
     // console.log('readin', this.options)
     // console.log('read', arguments)
   }
 
 }
 
-export interface Adapter {
+export interface Adapter<O> {
   push(chunk: Chunk, encoding?: string | null): any;
 }
