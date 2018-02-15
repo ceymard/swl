@@ -1,4 +1,6 @@
 {
   "name": "swl.json",
-  "version": "0.0.1"
+  "version": "0.0.1",
+  "main": "json.js",
+  "types": "json.d.ts"
 }

@@ -1,6 +1,10 @@
 {
-  "name": "swl.json",
+  "name": "swl.csv",
   "version": "0.0.1",
   "main": "csv.js",
-  "types": "csv.d.ts"
+  "types": "csv.d.ts",
+  "devDependencies": {
+    "@types/csv-stringify": "^1.4.2",
+    "csv-stringify": "^2.0.4"
+  }
 }

@@ -20,8 +20,7 @@ try_require(
 const args = `
   json://col1 {"a": 1, "b": 2}, {"a": 3, "b": 4}
 | json://col2 {"a": 5, "b": 6}, {"a": 7, "b": 8}
-| debug
-| json://test.json?beautify,object
+| csv://test-%col.csv?beautify,object,delimiter:;
 `
 const parse = PARSER.parse(args)
 
@@ -53,7 +52,7 @@ if (parse.status) {
     if (!adapter) {
       throw new Error(`No adapter found for ${in_registry}`)
     }
-    console.log(adapter.name, uri, options, body)
+    // console.log(adapter.name, uri, options, body)
     return new adapter(uri, options, body)
     // console.log(in_registry, options, body)
   })
