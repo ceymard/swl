@@ -26,27 +26,21 @@ export interface Chunk {
  */
 export abstract class Adapter extends Duplex {
 
+  public is_speaking = false
   public is_source = false
 
   static pipeline(readable: Adapter, ...rest: Adapter[]) {
     // var first = readable
-    var iter = readable
-    iter.is_source = true
+    var iter: Adapter = readable
+    iter.is_speaking = true
 
     for (var r of rest) {
       iter.pipe(r)
       iter = r
     }
-
-    // first.read()
-
-    // Last iterable gets a default writable that does nothing.
-    // iter.pipe(new Writable({objectMode: true, write() {
-    //   // does nothing !
-    // }}))
   }
 
-  constructor(public options: any = {}, public body: string = '') {
+  constructor(public uri: string, public options: any = {}, public body: string = '') {
     super({objectMode: true})
   }
 
@@ -64,7 +58,7 @@ export abstract class Adapter extends Duplex {
     } else if (chunk.type === 'chunk') {
       res = await this.onChunk(payload)
     } else if (chunk.type === 'finished') {
-      this.is_source = true
+      this.is_speaking = true
       res = await this.onUpstreamFinished()
     }
 

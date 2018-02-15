@@ -5,8 +5,10 @@
     "swl": "lib/swl.js"
   },
   "dependencies": {
-    "@types/highland": "^2.10.6",
-    "@types/parsimmon": "^1.6.1",
     "parsimmon": "^1.6.4"
+  },
+  "devDependencies": {
+    "@types/parsimmon": "^1.6.1",
+    "@types/node": "^9.4.6"
   }
 }
