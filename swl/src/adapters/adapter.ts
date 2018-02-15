@@ -2,9 +2,22 @@
 import {Duplex, Writable} from 'stream'
 
 
+export interface CollectionStartPayload {
+  name: string
+  topology: string[] // ???
+}
+
+export interface CollectionEndPayload {
+  name: string
+}
+
+export interface ErrorPayload {
+  error: Error
+}
+
 export interface Chunk {
-  type: 'chunk' | 'error' | 'end' | 'collection-start' | 'collection-end'
-  payload?: any
+  type: 'chunk' | 'error' | 'finished' | 'start' | 'end'
+  payload?: CollectionStartPayload | CollectionEndPayload | ErrorPayload
 }
 
 
@@ -13,12 +26,12 @@ export interface Chunk {
  */
 export abstract class Adapter extends Duplex {
 
-  public is_first = false
+  public is_source = false
 
   static pipeline(readable: Adapter, ...rest: Adapter[]) {
-    var first = readable
+    // var first = readable
     var iter = readable
-    iter.is_first = true
+    iter.is_source = true
 
     for (var r of rest) {
       iter.pipe(r)
@@ -41,9 +54,28 @@ export abstract class Adapter extends Duplex {
 
   }
 
-  abstract async handle(chunk: Chunk): Promise<Chunk | null | void>;
+  async handle(chunk: Chunk): Promise<Chunk | null | void> {
+    var res: any
+    const payload = chunk.payload
+    if (chunk.type === 'start') {
+      res = await this.onCollectionStart(payload)
+    } else if (chunk.type === 'end') {
+      res = await this.onCollectionEnd(payload)
+    } else if (chunk.type === 'chunk') {
+      res = await this.onChunk(payload)
+    } else if (chunk.type === 'finished') {
+      this.is_source = true
+      res = await this.onUpstreamFinished()
+    }
 
-  async onCollectionStart(payload: any) {
+    if (res !== null) {
+      return {type: chunk.type, payload: res ? res : payload}
+    } else {
+      return null
+    }
+  }
+
+  async onCollectionStart(payload: any): Promise<CollectionStartPayload | null | void> {
 
   }
 
@@ -55,7 +87,11 @@ export abstract class Adapter extends Duplex {
    * Override to do something when the first adapter finished.
    * This may be received only once.
    */
-  async onUpstreamEnd() {
+  async onUpstreamFinished(): Promise<null | void> {
+
+  }
+
+  async onChunk(payload: any) {
 
   }
 
