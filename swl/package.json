@@ -4,6 +4,8 @@
   "bin": {
     "swl": "lib/swl.js"
   },
+  "main": "lib/lib.js",
+  "types": "lib/lib.d.ts",
   "dependencies": {
     "parsimmon": "^1.6.4"
   },

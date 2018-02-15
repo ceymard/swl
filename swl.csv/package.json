@@ -1,0 +1,6 @@
+{
+  "name": "swl.json",
+  "version": "0.0.1",
+  "main": "csv.js",
+  "types": "csv.d.ts"
+}

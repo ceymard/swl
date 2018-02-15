@@ -4,9 +4,22 @@ import {PARSER} from './cmdparse'
 import {PARSER as OPARSER} from './oparse'
 import {Adapter, registry} from './adapters'
 
+export * from './adapters'
+
+function try_require(...names: string[]) {
+  for (var name of names) try { require(name) } catch { }
+}
+
+try_require(
+  'swl.json',
+  'swl.csv',
+  'swl.postgres',
+  'swl.sqlite'
+)
+
 const args = `
-  json:// {"a": 1, "b": 2}, {"a": 3, "b": 4}
-| json:// {"a": 5, "b": 6}, {"a": 7, "b": 8}
+  json://col1 {"a": 1, "b": 2}, {"a": 3, "b": 4}
+| json://col2 {"a": 5, "b": 6}, {"a": 7, "b": 8}
 | debug
 | json://test.json?beautify,object
 `

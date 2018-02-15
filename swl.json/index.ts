@@ -1,7 +1,6 @@
-import {Adapter, CollectionStartPayload} from './adapter'
+import {Adapter, CollectionStartPayload} from 'swl'
 import {basename} from 'path'
 import {createWriteStream, WriteStream} from 'fs'
-
 
 export interface JsonAdapterOptions {
   beautify?: boolean
