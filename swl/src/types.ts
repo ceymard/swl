@@ -8,7 +8,7 @@ export type Topology =
 /**
  * Records are the objects that flow within our system
  */
-export class Data {
+export class Chunk {
   constructor(
     public collection: string,
     public topology: Topology,
