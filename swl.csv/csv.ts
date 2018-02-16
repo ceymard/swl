@@ -32,6 +32,12 @@ export class CsvAdapter extends Adapter<CsvAdapterOptions> {
     })
 
     const opt = this.schema.cast(this.options)
+
+    this.setOptions({
+      encoding: 'utf-8',
+      header: true,
+      delimiter: ','
+    })
     console.log(opt)
 
     this.out!.pipe(file)

@@ -13,14 +13,19 @@ function try_require(...names: string[]) {
 try_require(
   'swl.json',
   'swl.csv',
+  'swl.yaml',
   'swl.postgres',
-  'swl.sqlite'
+  'swl.sqlite',
+  'swl.imap',
+  'swl.mysql',
+  'swl.oracle'
 )
 
 const args = `
-  json://col1 {"a": 1, "b": 2}, {"a": 3, "b": 4}
-|< json://col2 {"a": 5, "b": 6}, {"a": 7, "b": 8}
-| csv://test-%col.csv?beautify,object,delimiter:;
+  inline-json?col1 {"a": 1, "b": 2}, {"a": 3, "b": 4}
+|< ./myfile.json
+|< inline-json?collection:col2 {"a": 5, "b": 6}, {"a": 7, "b": 8}
+| ./test-%col.csv?beautify,object,delimiter:;
 `
 
 const parse = PARSER.parse(args)

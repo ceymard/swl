@@ -1,5 +1,5 @@
 
-import {Duplex, Writable} from 'stream'
+import {Duplex, Writable, Readable} from 'stream'
 import * as yup from 'yup'
 
 export interface CollectionStartPayload {
@@ -40,6 +40,8 @@ export abstract class Adapter<O extends Object> extends Duplex {
 
   public is_speaking = false
   public is_source = false
+  public is_passthrough = false
+  public is_handling = true
 
   schema = yup.object()
 
@@ -71,7 +73,7 @@ export abstract class Adapter<O extends Object> extends Duplex {
     super({objectMode: true})
   }
 
-  setOptions(options: any) {
+  setOptions<T>(options: Partial<T>) {
 
   }
 
@@ -117,6 +119,11 @@ export abstract class Adapter<O extends Object> extends Duplex {
   }
 
   async _write(chunk: Chunk, encoding: string, callback: () => any) {
+    if (!this.is_handling) {
+      this.push(chunk, encoding)
+      return callback()
+    }
+
     const modified = await this.handle(chunk)
     if (modified !== null)
       this.push(modified ? modified : chunk)
@@ -134,17 +141,14 @@ export abstract class Adapter<O extends Object> extends Duplex {
   /**
    * An even more private version of _read !
   */
-  __read() {
+  emitData() {
 
   }
 
   _read() {
     if (this.is_speaking && this.is_source) {
-
-      this.__read()
+      this.emitData()
     }
-    // console.log('readin', this.options)
-    // console.log('read', arguments)
   }
 
 }
@@ -155,15 +159,21 @@ export interface Adapter<O extends Object> {
 
 export class Source {
 
-}
+  /**
+   *
+   */
+  constructor(public source: string | Readable) {
 
-export class Transformer {
+  }
 
 }
 
 /**
- * Are sinks that different from transformers ?
+ * All the rest are transformers !
+ * They're the ones that may be set up as passthrough
  */
-export class Sink {
+export class Transformer {
+
+  public is_passthrough = false
 
 }
