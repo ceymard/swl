@@ -2,7 +2,13 @@
   "name": "swl-workspace",
   "private": true,
   "version": "1.0.0",
+  "scripts": {
+    "watch": "for dir in swl* ; do (cd \"$dir\" && wtsc -w | sed 's/\\x1Bc//g') & done "
+  },
   "workspaces": [
     "./*"
-  ]
+  ],
+  "dependencies": {
+    "concurrently": "^3.5.1"
+  }
 }
