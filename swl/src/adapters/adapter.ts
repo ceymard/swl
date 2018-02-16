@@ -1,6 +1,6 @@
 
 import {Duplex, Writable} from 'stream'
-
+import * as yup from 'yup'
 
 export interface CollectionStartPayload {
   name: string
@@ -40,6 +40,8 @@ export abstract class Adapter<O extends Object> extends Duplex {
 
   public is_speaking = false
   public is_source = false
+
+  schema = yup.object()
 
   static register(...uri: string[]) {
     for (var u of uri)
@@ -147,6 +149,21 @@ export abstract class Adapter<O extends Object> extends Duplex {
 
 }
 
-export interface Adapter<O> {
+export interface Adapter<O extends Object> {
   push(chunk: Chunk, encoding?: string | null): any;
+}
+
+export class Source {
+
+}
+
+export class Transformer {
+
+}
+
+/**
+ * Are sinks that different from transformers ?
+ */
+export class Sink {
+
 }

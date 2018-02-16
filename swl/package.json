@@ -7,10 +7,12 @@
   "main": "lib/lib.js",
   "types": "lib/lib.d.ts",
   "dependencies": {
-    "parsimmon": "^1.6.4"
+    "parsimmon": "^1.6.4",
+    "yup": "^0.24.1"
   },
   "devDependencies": {
+    "@types/node": "^9.4.6",
     "@types/parsimmon": "^1.6.1",
-    "@types/node": "^9.4.6"
+    "@types/yup": "^0.24.1"
   }
 }

@@ -19,9 +19,10 @@ try_require(
 
 const args = `
   json://col1 {"a": 1, "b": 2}, {"a": 3, "b": 4}
-| json://col2 {"a": 5, "b": 6}, {"a": 7, "b": 8}
+|< json://col2 {"a": 5, "b": 6}, {"a": 7, "b": 8}
 | csv://test-%col.csv?beautify,object,delimiter:;
 `
+
 const parse = PARSER.parse(args)
 
 const re_inst = /^(?:(\w+):\/\/)?([^?\s]*)(\?)?([^]*)/

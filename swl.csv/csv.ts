@@ -1,7 +1,7 @@
 import {Adapter, CollectionStartPayload} from 'swl'
-import {Writable} from 'stream'
 import * as fs from 'fs'
 import * as stringify from 'csv-stringify'
+import * as yup from 'yup'
 
 export interface CsvAdapterOptions {
   encoding?: string
@@ -11,8 +11,14 @@ export interface CsvAdapterOptions {
 
 export class CsvAdapter extends Adapter<CsvAdapterOptions> {
 
+  schema = yup.object({
+    encoding: yup.string().default('utf-8'),
+    header: yup.boolean().default(true),
+    delimiter: yup.string().default(',')
+  })
+
   is_source = false
-  out: Writable | null = null
+  out: stringify.Stringifier | null = null
 
   async onCollectionStart({name}: CollectionStartPayload) {
     var file = fs.createWriteStream(this.uri.replace('%col', name), {
@@ -24,6 +30,9 @@ export class CsvAdapter extends Adapter<CsvAdapterOptions> {
       header: this.options.header || true,
       delimiter: this.options.delimiter || ','
     })
+
+    const opt = this.schema.cast(this.options)
+    console.log(opt)
 
     this.out!.pipe(file)
       // .pipe(file)

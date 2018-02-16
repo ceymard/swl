@@ -26,12 +26,12 @@ const QUOTED = R(/'[^']*'|"[^"]*"/).map(res => res.slice(1, -1))
 const TRUE = P.alt(S`true`, S`yes`).map(_ => true)
 const FALSE = P.alt(S`false`, S`no`).map(_ => false)
 const REGEXP = R(re_regexp).map(r => {
-  const [_, src, flags] = re_regexp.exec(r)!
+  const [src, flags] = re_regexp.exec(r)!.slice(1)
   return new RegExp(src, flags||'')
 })
 
 const DATE = R(re_date).map(r => {
-  const [_, year, month, day, hh, mm, ss] = re_date.exec(r)!
+  const [year, month, day, hh, mm, ss] = re_date.exec(r)!.slice(1)
   return new Date(i(year), i(month) - 1, i(day), i(hh)||0, i(mm)||0, i(ss)||0)
 
 })
