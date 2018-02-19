@@ -1,12 +1,13 @@
-import {Adapter, Chunk} from './adapter'
+import {PipelineComponent, EventType} from './adapter'
 import {inspect} from 'util'
 
-export class DebugAdapter extends Adapter<{}> {
+export class DebugAdapter extends PipelineComponent {
 
-  async handle(chunk: Chunk) {
-    console.log(`${chunk.type}: ${inspect(chunk.payload, {colors: true, depth: null})}`)
+  async process(type: EventType, payload: any) {
+    console.log(`${type}: ${inspect(payload, {colors: true, depth: null})}`)
+    this.send(type, payload)
   }
 
 }
 
-DebugAdapter.register('debug')
+// DebugAdapter.register('debug')

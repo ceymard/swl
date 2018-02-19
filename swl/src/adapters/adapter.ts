@@ -1,179 +1,215 @@
 
-import {Duplex, Writable, Readable} from 'stream'
-import * as yup from 'yup'
+export type EventType =
+    'start'
+  | 'data'
+  | 'stop'
+  | 'end'
+  | 'error'
+  | 'exec'
 
-export interface CollectionStartPayload {
-  name: string
-  topology: string[] // ???
-}
-
-export interface CollectionEndPayload {
-  name: string
-}
-
-export interface ErrorPayload {
-  error: Error
-}
 
 export interface Chunk {
-  type: 'chunk' | 'error' | 'finished' | 'start' | 'end'
-  payload?: CollectionStartPayload | CollectionEndPayload | ErrorPayload
+  payload: PipelineEvent
+  next: Chunk | null
 }
 
-
-export interface AdapterCreator {
-  new (uri: string, options: any, body: string): Adapter<any>
+export interface PipelineEvent {
+  type: EventType
+  cleared_on?: {[pipe_id: string]: true}
+  payload: any
 }
 
-export const registry: {
-  [name: string]: AdapterCreator
-} = {}
+export class Lock {
+  waiting = false
+  prom: Function | null = null
 
-export const mime_registry: {
-  [name: string]: AdapterCreator
-} = {}
-
-/**
- *
- */
-export abstract class Adapter<O extends Object> extends Duplex {
-
-  public is_speaking = false
-  public is_source = false
-  public is_passthrough = false
-  public is_handling = true
-
-  schema = yup.object()
-
-  static register(...uri: string[]) {
-    for (var u of uri)
-      registry[u] = this as any
-    return this
-  }
-
-  static registerMime(...mimes: string[]) {
-    for (var u of mimes)
-      mime_registry[u] = this as any
-    return this
-  }
-
-  static pipeline(...rest: Adapter<any>[]) {
-    // var first = readable
-    var iter: Adapter<any> = rest[0]
-    rest = rest.slice(1)
-    iter.is_speaking = true
-
-    for (var r of rest) {
-      iter.pipe(r)
-      iter = r
+  release() {
+    this.waiting = false
+    if (this.prom) {
+      this.prom()
+      this.prom = null
     }
   }
 
-  constructor(public uri: string, public options: O = {} as any, public body: string = '') {
-    super({objectMode: true})
+  wait(): Promise<void> {
+    this.waiting = true
+    return new Promise((accept) => {
+      this.prom = accept
+    })
+  }
+}
+
+
+/**
+ * We don't allow more than this many objects into the stream.
+ */
+export var MAX_STACK_LENGTH = 1024
+
+
+export class ChunkStack {
+  first: Chunk | null = null
+  last: Chunk | null = null
+  count: number = 0
+  private wlock = new Lock()
+  private rlock = new Lock()
+
+  isFull() {
+    return this.count >= MAX_STACK_LENGTH
   }
 
-  setOptions<T>(options: Partial<T>) {
+  async write(type: EventType, payload: any) {
+    const ch = {
+      payload: {type, payload}, next: null
+    }
+
+    if (this.count >= MAX_STACK_LENGTH) {
+      await this.wlock.wait()
+    }
+
+    if (this.count === 0) {
+      this.first = ch
+      this.last = ch
+    } else {
+      this.last!.next = ch
+      this.last = ch
+    }
+    this.count++
+    if (this.rlock.waiting) this.rlock.release()
+  }
+
+  async read(): Promise<PipelineEvent | null> {
+    if (this.count === 0) {
+      await this.rlock.wait()
+    }
+    var ch = this.first!
+
+    this.first = ch.next
+    if (ch.next === null)
+      this.last = null
+
+    this.count--
+    if (this.wlock.waiting) this.wlock.release()
+    return ch.payload
+  }
+
+}
+
+
+
+export class PipelineComponent {
+
+  public prev!: PipelineComponent
+  public sub_pipe_id: string = ''
+
+  protected out = new ChunkStack()
+  protected handlers = {}
+
+  constructor() {
 
   }
 
-  async handle(chunk: Chunk): Promise<Chunk | null | void> {
+  async send(type: EventType, payload?: any) {
+    await this.out.write(type, payload)
+  }
+
+  async onstart(payload: any): Promise<any> {
+
+  }
+
+  async ondata(payload: any): Promise<any> {
+
+  }
+
+  async onstop(payload: any): Promise<any> {
+
+  }
+
+  async onend(payload: any): Promise<any> {
+
+  }
+
+  async onexec(payload: any): Promise<any> {
+
+  }
+
+  async onerror(payload: any): Promise<any> {
+
+  }
+
+  async process(type: EventType, payload?: any) {
     var res: any
-    const payload = chunk.payload
-    if (chunk.type === 'start') {
-      res = await this.onCollectionStart(payload)
-    } else if (chunk.type === 'end') {
-      res = await this.onCollectionEnd(payload)
-    } else if (chunk.type === 'chunk') {
-      res = await this.onChunk(payload)
-    } else if (chunk.type === 'finished') {
-      this.is_speaking = true
-      res = await this.onUpstreamFinished()
+
+    if (type === 'start') {
+      res = await this.onstart(payload)
+    } else if (type === 'data') {
+      res = await this.ondata(payload)
+    } else if (type === 'stop') {
+      res = await this.onstop(payload)
+    } else if (type === 'end') {
+      res = await this.onend(payload)
+    } else if (type === 'exec') {
+      res = await this.onexec(payload)
+    } else if (type === 'error') {
+      res = await this.onerror(payload)
     }
 
     if (res !== null) {
-      return {type: chunk.type, payload: res ? res : payload}
-    } else {
-      return null
+      this.send(type, res ? res : payload)
     }
   }
 
-  async onCollectionStart(payload: any): Promise<CollectionStartPayload | null | void> {
+  async readFromUpstream() {
+    var ch: PipelineEvent | null
+    var prev_out = this.prev.out
 
-  }
-
-  async onCollectionEnd(payload: any) {
-
-  }
-
-  /**
-   * Override to do something when the first adapter finished.
-   * This may be received only once.
-   */
-  async onUpstreamFinished(): Promise<null | void> {
-
-  }
-
-  async onChunk(payload: any): Promise<null | any> {
-
-  }
-
-  async _write(chunk: Chunk, encoding: string, callback: () => any) {
-    if (!this.is_handling) {
-      this.push(chunk, encoding)
-      return callback()
-    }
-
-    const modified = await this.handle(chunk)
-    if (modified !== null)
-      this.push(modified ? modified : chunk)
-    callback()
-  }
-
-  async writeOther(writable: Writable, data: any) {
-    return new Promise((done) => {
-      if (!writable.write(data))
-        writable.once('drain', done)
-      else done()
-    })
-  }
-
-  /**
-   * An even more private version of _read !
-  */
-  emitData() {
-
-  }
-
-  _read() {
-    if (this.is_speaking && this.is_source) {
-      this.emitData()
+    while ( (ch = await prev_out.read()) ) {
+      var {type, payload} = ch!
+      try {
+        await this.process(type, payload)
+      } catch (e) {
+        // FIXME ?
+        // console.log(e.stack)
+      }
+      // Handle the payloads here, redispatch to the correct methods (?)
     }
   }
 
 }
 
-export interface Adapter<O extends Object> {
-  push(chunk: Chunk, encoding?: string | null): any;
-}
-
-export class Source {
-
-  /**
-   *
-   */
-  constructor(public source: string | Readable) {
-
-  }
-
-}
 
 /**
- * All the rest are transformers !
- * They're the ones that may be set up as passthrough
+ * A source only
  */
-export class Transformer {
+export class Source extends PipelineComponent {
 
-  public is_passthrough = false
+  /**
+   * Method that the sources will have to implement.
+   * emit() is called when this source should be starting to emit stuff.
+   */
+  async emit() {
+    // There will probably be a bunch of write() here.
+  }
 
+  /**
+   * Handle an upstream end as the fact that we'll start talking now.
+   */
+  async onend() {
+    // We will emit shortly.
+    setTimeout(() => this.emit(), 0)
+    return null
+  }
+
+}
+
+
+export function pipeline(first: PipelineComponent, ...rest: PipelineComponent[]) {
+  var iter = first
+  for (var r of rest) {
+    r.prev = iter
+    iter = r
+    iter.readFromUpstream()
+  }
+
+  // Get the first component to speak (it should be a source !)
+  first.process('end')
 }

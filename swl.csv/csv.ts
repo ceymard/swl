@@ -1,4 +1,5 @@
-import {Adapter, CollectionStartPayload} from 'swl'
+import {PipelineComponent} from 'swl'
+
 import * as fs from 'fs'
 import * as stringify from 'csv-stringify'
 import * as yup from 'yup'
@@ -9,7 +10,7 @@ export interface CsvAdapterOptions {
   delimiter?: string
 }
 
-export class CsvAdapter extends Adapter<CsvAdapterOptions> {
+export class CsvOutput extends PipelineComponent {
 
   schema = yup.object({
     encoding: yup.string().default('utf-8'),
@@ -18,41 +19,35 @@ export class CsvAdapter extends Adapter<CsvAdapterOptions> {
   })
 
   is_source = false
-  out: stringify.Stringifier | null = null
+  output!: stringify.Stringifier
 
-  async onCollectionStart({name}: CollectionStartPayload) {
+  constructor(public options: CsvAdapterOptions, public uri: string) {
+    super()
+  }
+
+  async onstart(name: string) {
     var file = fs.createWriteStream(this.uri.replace('%col', name), {
       flags: 'w',
       // encoding: this.options.encoding || 'utf-8'
     })
 
-    this.out = stringify({
+    this.output = stringify({
       header: this.options.header || true,
       delimiter: this.options.delimiter || ','
     })
 
-    const opt = this.schema.cast(this.options)
-
-    this.setOptions({
-      encoding: 'utf-8',
-      header: true,
-      delimiter: ','
-    })
-    console.log(opt)
-
-    this.out!.pipe(file)
-      // .pipe(file)
+    this.output.pipe(file)
   }
 
-  async onCollectionEnd() {
-    this.out!.end()
+  async onstop() {
+    this.output.end()
   }
 
-  async onChunk(chk: any) {
-    this.out!.write(chk)
+  async ondata(chk: any) {
+    this.output.write(chk)
   }
 
 }
 
-CsvAdapter.register('csv')
-  .registerMime('text/csv')
+// CsvAdapter.register('csv')
+//   .registerMime('text/csv')
