@@ -1,8 +1,9 @@
 
+import {EventEmitter} from 'events'
+
 export type EventType =
     'start'
   | 'data'
-  | 'stop'
   | 'end'
   | 'error'
   | 'exec'
@@ -37,6 +38,21 @@ export class Lock {
       this.prom = accept
     })
   }
+}
+
+
+export type WriteStreamCreator = (colname: string) => NodeJS.WritableStream
+
+
+async function resume_once(em: EventEmitter, event: string) {
+  var acc: Function
+  const prom = new Promise((accept) => {
+    acc = accept
+  })
+
+  em.once(event, () => acc())
+
+  return prom
 }
 
 
@@ -202,11 +218,71 @@ export class Source extends PipelineComponent {
 }
 
 
-export class FileSource extends Source {
+export class StreamSource extends Source {
 
-  constructor(public source: Stream) {
+  ended = false
+  _codec: NodeJS.ReadWriteStream | null = null
+
+  constructor(public source: NodeJS.ReadableStream) {
+    super()
+    source.on('end', () => {
+      this.ended = true
+    })
+  }
+
+  /**
+   * Set a codec on this stream source
+   * @param codec The codec to set this source to.
+   */
+  codec(codec: NodeJS.ReadWriteStream) {
+    this.source = this.source.pipe(codec)
+  }
+
+  async readSource() {
+    var res: any
+    while ( (res = this.source.read()) ) {
+      if (res != null)
+        return res
+      if (this.ended)
+        return null
+      await resume_once(this.source, 'readable')
+    }
+  }
+
+  async emit() {
+
+  }
+
+}
+
+
+export class StreamSink extends PipelineComponent {
+
+  writable!: NodeJS.ReadWriteStream
+
+  constructor(public creator: WriteStreamCreator) {
     super()
   }
+
+  codec(codec: NodeJS.ReadWriteStream) {
+    this.writable = codec
+  }
+
+  async onstart(name: string) {
+    this.writable.unpipe()
+    const wrt = this.creator(name)
+    this.writable.pipe(wrt)
+  }
+
+  async output(chk: any) {
+    if (!this.writable.write(chk))
+      await resume_once(this.writable, 'drain')
+  }
+
+}
+
+
+export class FileSink extends StreamSink {
 
 }
 

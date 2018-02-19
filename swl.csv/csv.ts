@@ -1,4 +1,4 @@
-import {PipelineComponent} from 'swl'
+import {FileSink} from 'swl'
 
 import * as fs from 'fs'
 import * as stringify from 'csv-stringify'
@@ -10,7 +10,7 @@ export interface CsvAdapterOptions {
   delimiter?: string
 }
 
-export class CsvOutput extends PipelineComponent {
+export class CsvOutput extends FileSink {
 
   schema = yup.object({
     encoding: yup.string().default('utf-8'),
@@ -44,7 +44,7 @@ export class CsvOutput extends PipelineComponent {
   }
 
   async ondata(chk: any) {
-    this.output.write(chk)
+    await this.writeSink(this.output, chk)
   }
 
 }
