@@ -202,6 +202,15 @@ export class Source extends PipelineComponent {
 }
 
 
+export class FileSource extends Source {
+
+  constructor(public source: Stream) {
+    super()
+  }
+
+}
+
+
 export function pipeline(first: PipelineComponent, ...rest: PipelineComponent[]) {
   var iter = first
   for (var r of rest) {
