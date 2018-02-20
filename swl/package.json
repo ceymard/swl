@@ -8,6 +8,7 @@
   "types": "lib.d.ts",
   "dependencies": {
     "parsimmon": "^1.6.4",
+    "source-map-support": "^0.5.3",
     "yup": "^0.24.1"
   },
   "devDependencies": {
