@@ -66,6 +66,10 @@ export class PipelineComponent {
 
   protected handlers = {}
 
+  constructor(public options: any) {
+
+  }
+
   start(name: string): StartEvent {
     return {type: 'start', name, emitter: this.constructor.name}
   }
@@ -127,8 +131,8 @@ export class StreamSource extends Source {
   ended = false
   _codec: NodeJS.ReadWriteStream | null = null
 
-  constructor(public source: NodeJS.ReadableStream) {
-    super()
+  constructor(options: any, public source: NodeJS.ReadableStream) {
+    super(options)
     source.on('end', () => {
       this.ended = true
     })
@@ -161,8 +165,8 @@ export abstract class StreamSink extends PipelineComponent {
   writable!: NodeJS.ReadWriteStream
   stream!: NodeJS.WritableStream
 
-  constructor(public options: any, public creator: WriteStreamCreator) {
-    super()
+  constructor(options: any, public creator: WriteStreamCreator) {
+    super(options)
   }
 
   abstract async codec(): Promise<NodeJS.ReadWriteStream>

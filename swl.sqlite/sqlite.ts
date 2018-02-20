@@ -1,5 +1,5 @@
 
-import {Source, PipelineEvent, PipelineComponent, register_source} from 'swl'
+import {Source, PipelineEvent, PipelineComponent, register_source, URI_AND_OBJ} from 'swl'
 import * as S from 'better-sqlite3'
 
 
@@ -8,17 +8,28 @@ export type Selector = boolean | string
 
 export class SqliteSource extends Source {
 
-  constructor(public filename: string, public options = {}, public sources: {[name: string]: Selector} = {}) {
-    super()
+  constructor(
+    public options: any,
+    public filename: string,
+    public sources: {[name: string]: Selector} = {}
+  ) {
+    super(options)
   }
 
   async *emit(): AsyncIterableIterator<PipelineEvent> {
     const db = new S(this.filename, this.options)
 
-    for (var colname in this.sources) {
+    var keys = Object.keys(this.sources)
+    if (keys.length === 0) {
+      // Auto-detect *tables* (not views)
+      const st = db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
+      keys = st.all().map(k => k.name)
+    }
+
+    for (var colname of keys) {
       var val = this.sources[colname]
 
-      var sql = typeof val === 'boolean' ? `SELECT * FROM "${colname}"`
+      var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
       : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
       : val
 
@@ -33,8 +44,10 @@ export class SqliteSource extends Source {
 
 }
 
-register_source((parse: string) => {
-  return new SqliteSource(parse, {}, {})
+register_source(async (opts: any, parse: string) => {
+  const [file, sources] = URI_AND_OBJ.tryParse(parse)
+  console.log(file, sources)
+  return new SqliteSource(opts, file, sources)
 }, 'sqlite')
 
 
@@ -44,7 +57,7 @@ export class SqliteSink extends PipelineComponent {
   db!: S
 
   constructor(public filename: string, public options: any = {}) {
-    super()
+    super(options)
   }
 
   run(options: any, body: string) {

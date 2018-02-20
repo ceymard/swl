@@ -109,10 +109,20 @@ const PIPE = P.seqMap(
   (i, m) => [i, ...m]
 )
 
+export const URI = P.regex(/(\\\?|\\\s|[^\?\s]+)/)
+
+export const URI_AND_OBJ = P.seqMap(
+  P.optWhitespace,
+  URI,
+  P.optWhitespace,
+  OBJECT.atMost(1),
+  P.optWhitespace,
+  (_, uri, _2, obj) => [uri, obj[0]] as [string, any]
+)
 
 export const URI_WITH_OPTS = P.seqMap(
   P.optWhitespace,
-  P.regex(/[^\?\n\s]+/),
+  URI,
   P.alt(
     P.seqMap(S`?`, OBJECT, P.optWhitespace ,(_q, ob) => ob),
     P.optWhitespace.map(_ => null)
@@ -124,7 +134,7 @@ export const PARSER = PIPE
 
 export const ADAPTER_AND_OPTIONS = P.seqMap(
   P.optWhitespace,
-  P.regex(/[^\?\s\n]+/),
+  URI,
   P.alt(
     P.seqMap(S`?`, OBJECT, P.optWhitespace ,(_q, ob) => ob),
     P.optWhitespace.map(_ => null)
