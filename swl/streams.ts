@@ -1,4 +1,4 @@
-import {createWriteStream} from 'fs'
+import {createWriteStream, createReadStream} from 'fs'
 
 export async function make_write_creator(uri: string, options: any) {
   // Check for protocol !!
@@ -12,11 +12,5 @@ export async function make_write_creator(uri: string, options: any) {
 
 export async function make_read_creator(uri: string, options: any) {
   // Check for protocol !!
-  var glob = uri.indexOf('*')
-  if (glob) {
-
-  }
-  return function () {
-
-  }
+  return createReadStream(uri, options) as NodeJS.ReadableStream
 }

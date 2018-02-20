@@ -12,7 +12,8 @@ const args = `
   inline-json?col1 {"a": 1, "b": 2}, {"a": 5, "b": 6}
   |< inline-json?col2 {"a": "zobi", "b": "zob"}
   |< sqlite test.db
-  | debug
+  | sanitize
+  | csv test-*.csv?encoding:latin1
 `
 
 async function run() {

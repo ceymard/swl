@@ -18,6 +18,7 @@ export class SqliteSource extends Source {
 
   async *emit(): AsyncIterableIterator<PipelineEvent> {
     const db = new S(this.filename, this.options)
+    // Throw error if db doesn't exist ! (unless option specifically allows for that)
 
     var keys = Object.keys(this.sources)
     if (keys.length === 0) {
@@ -46,7 +47,7 @@ export class SqliteSource extends Source {
 
 register_source(async (opts: any, parse: string) => {
   const [file, sources] = URI_AND_OBJ.tryParse(parse)
-  console.log(file, sources)
+  // console.log(file, sources)
   return new SqliteSource(opts, file, sources)
 }, 'sqlite')
 
