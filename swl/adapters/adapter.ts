@@ -6,17 +6,40 @@ import {EventEmitter} from 'events'
 export type EventType =
     'start'
   | 'data'
-  | 'end'
-  | 'error'
   | 'exec'
 
 
-export interface PipelineEvent {
+export interface PipelineEventBase {
   type: EventType
-  cleared_on?: {[pipe_id: string]: true}
   emitter: string
+  // cleared_on?: {[pipe_id: string]: true}
+}
+
+export interface StartEvent extends PipelineEventBase {
+  type: 'start'
+  name: string
+}
+
+export interface DataEvent extends PipelineEventBase {
+  type: 'data'
   payload: any
 }
+
+export interface ExecEvent extends PipelineEventBase {
+  type: 'exec'
+  method: string
+  options: any
+  body: string
+}
+
+export type PipelineEvent = StartEvent | DataEvent | ExecEvent
+
+// export interface PipelineEvent {
+//   type: EventType
+//   cleared_on?: {[pipe_id: string]: true}
+//   emitter: string
+//   payload: any
+// }
 
 
 export type WriteStreamCreator = (colname: string) => Promise<NodeJS.WritableStream> | NodeJS.WritableStream
@@ -43,8 +66,22 @@ export class PipelineComponent {
 
   protected handlers = {}
 
-  event(type: EventType, payload: any): PipelineEvent {
-    return {type, payload, emitter: this.constructor.name}
+  start(name: string): StartEvent {
+    return {type: 'start', name, emitter: this.constructor.name}
+  }
+
+  data(payload: any): DataEvent {
+    return {type: 'data', payload, emitter: this.constructor.name}
+  }
+
+  exec(method: string, options: any, body: string): ExecEvent {
+    return {
+      type: 'exec',
+      method,
+      options,
+      body,
+      emitter: this.constructor.name
+    }
   }
 
   upstream() {
@@ -109,7 +146,7 @@ export class StreamSource extends Source {
     var res: any
     while ( (res = this.source.read()) ) {
       if (res != null)
-        yield this.event('data', res)
+        yield this.data(res)
       if (this.ended)
         return
       await resume_once(this.source, 'readable')
@@ -142,7 +179,7 @@ export abstract class StreamSink extends PipelineComponent {
     for await (var ev of this.upstream()) {
       if (ev.type === 'start') {
         close()
-        stream = await this.creator(ev.payload)
+        stream = await this.creator(ev.name)
         writable = await this.codec()
         writable.pipe(stream)
       } else if (ev.type === 'data') {

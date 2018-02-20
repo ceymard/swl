@@ -5,7 +5,7 @@ export class DebugAdapter extends PipelineComponent {
 
   async *process() {
     for await (var event of this.upstream()) {
-      console.log(`${event.type}: ${inspect(event.payload, {colors: true, depth: null})}`)
+      console.log(`${inspect(event, {colors: true, depth: null})}`)
       yield event
     }
   }
