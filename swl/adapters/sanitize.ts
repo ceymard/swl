@@ -1,5 +1,5 @@
 
-import { PipelineComponent } from './adapter'
+import { PipelineComponent, PipelineEvent } from './adapter'
 import { register_sink } from 'swl/register'
 import * as y from 'yup'
 
@@ -27,7 +27,7 @@ export class Sanitizer extends PipelineComponent {
 
   options = this.schema.cast(this.options)
 
-  async *process() {
+  async *process(): AsyncIterableIterator<PipelineEvent> {
     var o = this.options
     for await (var ev of this.upstream()) {
       if (ev.type === 'start' && o.collections) {

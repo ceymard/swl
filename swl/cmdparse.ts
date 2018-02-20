@@ -85,8 +85,6 @@ export type Pipeline = PipelineContent[]
 
 const DIVIDER = S`|`
 const SOURCE_DIVIDER = S`|<`
-const LBRACKET = S`[[`
-const RBRACKET = S`]]`
 
 // const SINGLE = P.regex(/[^\?]+\?/)
 
