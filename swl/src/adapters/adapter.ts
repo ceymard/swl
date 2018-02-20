@@ -41,7 +41,7 @@ export class Lock {
 }
 
 
-export type WriteStreamCreator = (colname: string) => NodeJS.WritableStream
+export type WriteStreamCreator = (colname: string) => Promise<NodeJS.WritableStream> | NodeJS.WritableStream
 
 
 async function resume_once(em: EventEmitter, event: string) {
@@ -116,6 +116,7 @@ export class PipelineComponent {
 
   public prev!: PipelineComponent
   public sub_pipe_id: string = ''
+  started = false
 
   protected out = new ChunkStack()
   protected handlers = {}
@@ -156,12 +157,18 @@ export class PipelineComponent {
     var res: any
 
     if (type === 'start') {
+      if (this.started) {
+        await this.onstop(null)
+      }
+      this.started = true
       res = await this.onstart(payload)
     } else if (type === 'data') {
       res = await this.ondata(payload)
-    } else if (type === 'stop') {
-      res = await this.onstop(payload)
     } else if (type === 'end') {
+      if (this.started) {
+        await this.onstop(null)
+        this.started = false
+      }
       res = await this.onend(payload)
     } else if (type === 'exec') {
       res = await this.onexec(payload)
@@ -256,33 +263,38 @@ export class StreamSource extends Source {
 }
 
 
-export class StreamSink extends PipelineComponent {
+export abstract class StreamSink extends PipelineComponent {
 
   writable!: NodeJS.ReadWriteStream
+  stream!: NodeJS.WritableStream
 
-  constructor(public creator: WriteStreamCreator) {
+  constructor(public options: any, public creator: WriteStreamCreator) {
     super()
   }
 
-  codec(codec: NodeJS.ReadWriteStream) {
-    this.writable = codec
-  }
+  abstract async codec(): Promise<NodeJS.ReadWriteStream>
 
   async onstart(name: string) {
-    this.writable.unpipe()
-    const wrt = this.creator(name)
-    this.writable.pipe(wrt)
+    // this.writable.unpipe()
+
+    this.stream = await this.creator(name)
+    this.writable = await this.codec()
+    this.writable.pipe(this.stream)
+  }
+
+  async onstop() {
+    this.writable!.unpipe()
+    this.stream.end()
+  }
+
+  async ondata(chk: any) {
+    await this.output(chk)
   }
 
   async output(chk: any) {
-    if (!this.writable.write(chk))
-      await resume_once(this.writable, 'drain')
+    if (!this.writable!.write(chk))
+      await resume_once(this.writable!, 'drain')
   }
-
-}
-
-
-export class FileSink extends StreamSink {
 
 }
 

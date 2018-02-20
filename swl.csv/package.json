@@ -4,7 +4,11 @@
   "main": "csv.js",
   "types": "csv.d.ts",
   "devDependencies": {
+    "@types/csv-parse": "^1.1.11",
     "@types/csv-stringify": "^1.4.2",
     "csv-stringify": "^2.0.4"
+  },
+  "dependencies": {
+    "csv-parse": "^2.0.4"
   }
 }
