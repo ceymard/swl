@@ -1,5 +1,5 @@
 
-import {Source} from 'swl'
+import {Source, PipelineEvent} from 'swl'
 import * as S from 'better-sqlite3'
 
 
@@ -12,7 +12,7 @@ export class SqliteSource extends Source {
     super()
   }
 
-  async emit() {
+  async *emit(): AsyncIterableIterator<PipelineEvent> {
     const db = new S(this.filename, this.options)
 
     for (var colname in this.sources) {
@@ -24,9 +24,9 @@ export class SqliteSource extends Source {
 
       var stmt = db.prepare(sql)
 
-      this.send('start', colname)
+      yield this.event('start', colname)
       for (var s of stmt.iterate()) {
-        this.send('data', s)
+        yield this.event('data', s)
       }
     }
   }

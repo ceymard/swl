@@ -7,8 +7,10 @@
         "inlineSourceMap": true,
         "experimentalDecorators": true,
         "strict": true,
+        "rootDir": "./src",
+        "outDir": "./lib",
         "noUnusedLocals": true,
-        "lib": ["es6", "dom"]
+        "lib": ["es6", "esnext"]
     }
 
 }

@@ -1,17 +1,5 @@
-import {PipelineComponent, Source} from 'swl'
+import {Source, PipelineEvent} from 'swl'
 
-
-export interface JsonAdapterOptions {
-  beautify?: boolean
-  object?: boolean
-}
-
-export class JsonAdapter extends PipelineComponent {
-
-  done = false
-  first = true
-
-}
 
 var id = 0
 export class InlineJson extends Source {
@@ -23,16 +11,12 @@ export class InlineJson extends Source {
     this.objects = JSON.parse(`[${body}]`)
   }
 
-  async emit() {
-    await this.send('start', Object.keys(this.options)[0] || `json-${id++}`)
+  async *emit(): AsyncIterableIterator<PipelineEvent> {
+    yield this.event('start', Object.keys(this.options)[0] || `json-${id++}`)
     for (var o of this.objects) {
-      await this.send('data', o)
+      yield this.event('data', o)
     }
-    this.send('end')
   }
 
 }
 
-export class JsonSink extends PipelineComponent {
-
-}
