@@ -1,4 +1,4 @@
-import {Source, PipelineEvent} from 'swl'
+import {Source, PipelineEvent, register_source} from 'swl'
 
 var id = 0
 export class InlineJson extends Source {
@@ -19,3 +19,6 @@ export class InlineJson extends Source {
 
 }
 
+register_source(async (opts: any, str: string) => {
+  return new InlineJson(opts, str)
+}, 'inline-json')

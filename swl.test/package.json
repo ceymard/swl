@@ -1,0 +1,8 @@
+{
+  "name": "swl.test",
+  "private": true,
+  "scripts": {
+    "watch": "wtsc -w",
+    "build": "wtsc"
+  }
+}

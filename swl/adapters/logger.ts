@@ -1,5 +1,6 @@
 import {PipelineComponent, PipelineEvent} from './adapter'
 import {inspect} from 'util'
+import {register_sink} from 'swl/register'
 
 export class DebugAdapter extends PipelineComponent {
 
@@ -11,3 +12,8 @@ export class DebugAdapter extends PipelineComponent {
   }
 
 }
+
+
+register_sink(async (opts: any, str: string) => {
+  return new DebugAdapter()
+}, 'debug')

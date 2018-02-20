@@ -4,6 +4,10 @@
   "bin": {
     "swl": "swl.js"
   },
+  "scripts": {
+    "watch": "wtsc -w",
+    "build": "wtsc"
+  },
   "main": "lib.js",
   "types": "lib.d.ts",
   "dependencies": {

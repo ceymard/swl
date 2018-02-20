@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "main": "csv.js",
   "types": "csv.d.ts",
+  "scripts": {
+    "watch": "wtsc -w",
+    "build": "wtsc"
+  },
   "devDependencies": {
     "@types/csv-parse": "^1.1.11",
     "@types/csv-stringify": "^1.4.2",

@@ -1,4 +1,4 @@
-import {StreamSink, StreamSource} from 'swl'
+import {StreamSink, StreamSource, register_sink, URI_WITH_OPTS, make_write_creator} from 'swl'
 
 import * as stringify from 'csv-stringify'
 import * as yup from 'yup'
@@ -17,9 +17,6 @@ export class CsvOutput extends StreamSink {
     delimiter: yup.string().default(';')
   })
 
-  is_source = false
-  // output!: stringify.Stringifier
-
   async codec() {
     const opts = this.schema.cast(this.options)
     return stringify({
@@ -29,6 +26,11 @@ export class CsvOutput extends StreamSink {
   }
 
 }
+
+register_sink(async (opts: any, str: string) => {
+  const [uri, options] = URI_WITH_OPTS.tryParse(str)
+  return new CsvOutput(opts, await make_write_creator(uri, options))
+})
 
 
 export class CsvSource extends StreamSource {

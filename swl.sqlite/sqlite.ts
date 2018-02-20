@@ -77,8 +77,8 @@ export class SqliteSink extends PipelineComponent {
           // Create if not exists ?
           // Temporary ?
           this.db.exec(`
-            CREATE TABLE IF NOT EXISTS ${table}(
-              ${columns.map((c, i) => `${c} ${types[i]}`).join(', ')}
+            CREATE TABLE IF NOT EXISTS "${table}" (
+              ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
             )
           `)
 

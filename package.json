@@ -3,10 +3,10 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "watch": "for dir in swl* ; do (cd \"$dir\" && wtsc -w | sed 's/\\x1Bc//g') & done "
+    "watch": "concurrently -c red,green,blue,yellow,magenta -n swl,csv,json,sqlite,test 'cd swl && npm run watch' 'cd swl.csv && npm run watch' 'cd swl.json && npm run watch' 'cd swl.sqlite && npm run watch' 'cd swl.test && npm run watch'"
   },
   "workspaces": [
-    "./*"
+    "./swl*"
   ],
   "dependencies": {
     "concurrently": "^3.5.1"
