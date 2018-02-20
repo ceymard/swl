@@ -2,10 +2,10 @@
   "name": "swl",
   "version": "0.0.1",
   "bin": {
-    "swl": "lib/swl.js"
+    "swl": "swl.js"
   },
-  "main": "lib/lib.js",
-  "types": "lib/lib.d.ts",
+  "main": "lib.js",
+  "types": "lib.d.ts",
   "dependencies": {
     "parsimmon": "^1.6.4",
     "yup": "^0.24.1"

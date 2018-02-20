@@ -2,7 +2,7 @@ import {pipeline, DebugAdapter} from 'swl'
 import {InlineJson} from 'swl.json'
 import * as fs from 'fs'
 
-(Symbol as any).asyncIterator = Symbol.asyncIterator || Symbol.for("Symbol.asyncIterator");
+// (Symbol as any).asyncIterator = Symbol.asyncIterator || Symbol.for("Symbol.asyncIterator");
 
 import {CsvOutput} from 'swl.csv'
 import {SqliteSource} from 'swl.sqlite'
@@ -15,4 +15,4 @@ var s = new SqliteSource('test.db', {}, {
   visites_n101: `select * from "visites" where lower(secteur) = 'n0101'`
 })
 var c = new CsvOutput({}, (name: string) => fs.createWriteStream(`${name}.csv`));
-pipeline(s, d, c)
+pipeline(j, j2, s, d, c)

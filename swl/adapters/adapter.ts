@@ -1,4 +1,6 @@
 
+(Symbol as any).asyncIterator = Symbol.asyncIterator || Symbol.for("Symbol.asyncIterator");
+
 import {EventEmitter} from 'events'
 
 export type EventType =
@@ -41,76 +43,20 @@ export class PipelineComponent {
 
   protected handlers = {}
 
-  async onstart(payload: any): Promise<any> {
-
-  }
-
-  async ondata(payload: any): Promise<any> {
-
-  }
-
-  async onstop(payload: any): Promise<any> {
-
-  }
-
-  async onend(payload: any): Promise<any> {
-
-  }
-
-  async onexec(payload: any): Promise<any> {
-
-  }
-
-  async onerror(payload: any): Promise<any> {
-
-  }
-
   event(type: EventType, payload: any): PipelineEvent {
     return {type, payload, emitter: this.constructor.name}
   }
 
-  async process(event: PipelineEvent) {
-    var res: any
-    var {type, payload} = event
-
-    if (type === 'start') {
-      if (this.started) {
-        await this.onstop(null)
-      }
-      this.started = true
-      res = await this.onstart(payload)
-    } else if (type === 'data') {
-      res = await this.ondata(payload)
-    } else if (type === 'end') {
-      if (this.started) {
-        await this.onstop(null)
-        this.started = false
-      }
-      res = await this.onend(payload)
-    } else if (type === 'exec') {
-      res = await this.onexec(payload)
-    } else if (type === 'error') {
-      res = await this.onerror(payload)
-    }
-
-    return res === null ? null :
-      res ? this.event(type, res) : event
+  upstream() {
+    return this.prev ? this.prev.events() : []
   }
 
-  async *processUpstream(): AsyncIterableIterator<PipelineEvent> {
-    if (!this.prev) return
-
-    for await (var ev of this.prev.events()) {
-      var res = await this.process(ev)
-      if (res !== null)
-        yield res
-      // console.log(ev)
-    }
-
+  async *process(): AsyncIterableIterator<PipelineEvent> {
+    yield* this.upstream()
   }
 
   async *events() {
-    yield* this.processUpstream()
+    yield* this.process()
   }
 
 }
@@ -131,7 +77,7 @@ export class Source extends PipelineComponent {
 
   async *events() {
     // Yield whatever came before
-    yield* this.processUpstream()
+    yield* this.process()
     // Now that upstream is done, we can start emitting.
     yield* this.emit()
   }
@@ -159,19 +105,15 @@ export class StreamSource extends Source {
     this.source = this.source.pipe(codec)
   }
 
-  async readSource() {
+  async *emit(): AsyncIterableIterator<PipelineEvent> {
     var res: any
     while ( (res = this.source.read()) ) {
       if (res != null)
-        return res
+        yield this.event('data', res)
       if (this.ended)
-        return null
+        return
       await resume_once(this.source, 'readable')
     }
-  }
-
-  async *emit(): AsyncIterableIterator<PipelineEvent> {
-
   }
 
 }
@@ -188,26 +130,28 @@ export abstract class StreamSink extends PipelineComponent {
 
   abstract async codec(): Promise<NodeJS.ReadWriteStream>
 
-  async onstart(name: string) {
-    // this.writable.unpipe()
+  async *process(): AsyncIterableIterator<PipelineEvent> {
+    var stream: NodeJS.WritableStream | undefined
+    var writable: NodeJS.ReadWriteStream | undefined
 
-    this.stream = await this.creator(name)
-    this.writable = await this.codec()
-    this.writable.pipe(this.stream)
-  }
+    function close() {
+      if (writable) writable.end()
+      if (stream) stream.end()
+    }
 
-  async onstop() {
-    this.writable!.unpipe()
-    this.stream.end()
-  }
+    for await (var ev of this.upstream()) {
+      if (ev.type === 'start') {
+        close()
+        stream = await this.creator(ev.payload)
+        writable = await this.codec()
+        writable.pipe(stream)
+      } else if (ev.type === 'data') {
+        if (!writable!.write(ev.payload))
+          await resume_once(writable!, 'drain')
+      }
+    }
 
-  async ondata(chk: any) {
-    await this.output(chk)
-  }
-
-  async output(chk: any) {
-    if (!this.writable!.write(chk))
-      await resume_once(this.writable!, 'drain')
+    close()
   }
 
 }
@@ -221,6 +165,6 @@ export async function pipeline(first: PipelineComponent, ...rest: PipelineCompon
   }
 
   for await (var pkt of iter.events()) {
-    // Do nothing.
+    pkt // Do nothing.
   }
 }
