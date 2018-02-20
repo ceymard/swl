@@ -15,7 +15,7 @@ var s = new SqliteSource('test.db', {}, {
   visites_n101: `select * from "visites" where lower(secteur) = 'n0101'`
 })
 var c = new CsvOutput({}, (name: string) => fs.createWriteStream(`${name}.csv`));
-var ss = new SqliteSink('output.db', {})
+var ss = new SqliteSink('output.db', {truncate: true})
 pipeline(j, j2, s, d, ss).catch(e => {
   console.error(e.stack)
 })

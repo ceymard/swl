@@ -1,5 +1,5 @@
 
-import {Source, PipelineEvent, PipelineComponent} from 'swl'
+import {Source, PipelineEvent, PipelineComponent, register_source} from 'swl'
 import * as S from 'better-sqlite3'
 
 
@@ -33,13 +33,17 @@ export class SqliteSource extends Source {
 
 }
 
+register_source((parse: string) => {
+  return new SqliteSource(parse, {}, {})
+}, 'sqlite')
+
 
 export class SqliteSink extends PipelineComponent {
 
   mode: 'insert' | 'upsert' | 'update' = 'insert'
   db!: S
 
-  constructor(public filename: string, public options = {}) {
+  constructor(public filename: string, public options: any = {}) {
     super()
   }
 
@@ -53,6 +57,10 @@ export class SqliteSink extends PipelineComponent {
     var start = false
     var stmt: any
 
+    this.db = new S(this.filename, {})
+
+    this.db.exec('BEGIN')
+
     for await (var ev of this.upstream()) {
       if (ev.type === 'start') {
         start = true
@@ -63,15 +71,14 @@ export class SqliteSink extends PipelineComponent {
         // Check if we need to create the table
         if (start) {
           columns = Object.keys(payload)
-          var types = columns.map(c => typeof payload[c] === 'string' ? 'text'
-          : typeof payload[c] === 'number' ? 'float'
-          : payload[c] instanceof Date ? 'text'
-          : 'blob')
+          var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
+          : payload[c] instanceof Buffer ? 'blob'
+          : 'text')
           // Create if not exists ?
           // Temporary ?
           this.db.exec(`
             CREATE TABLE IF NOT EXISTS ${table}(
-
+              ${columns.map((c, i) => `${c} ${types[i]}`).join(', ')}
             )
           `)
 
@@ -83,6 +90,11 @@ export class SqliteSink extends PipelineComponent {
             // I would need some kind of primary key...
             stmt = this.db.prepare(`INSERT OR REPLACE INTO ${table}(${columns.map(c => `"${c}"`).join(', ')})
               values (${columns.map(c => '?').join(', ')})`)
+
+
+          if (this.options.truncate) {
+            this.db.exec(`DELETE FROM "${table}"`)
+          }
           start = false
         }
 
@@ -92,6 +104,8 @@ export class SqliteSink extends PipelineComponent {
         await (this as any)[ev.method](ev.options, ev.body)
       }
     }
+
+    this.db.exec('COMMIT')
 
   }
 

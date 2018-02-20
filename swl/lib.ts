@@ -21,10 +21,12 @@ try_require(
 export const sources: {[name: string]: (str: string) => Source} = {}
 export const sinks: {[name: string]: (str: string) => PipelineComponent} = {}
 
-export function register_source(name: string, maker: (str: string) => Source) {
-  sources[name] = maker
+export function register_source(maker: (str: string) => Source, ...mimes: string[]) {
+  for (var name of mimes)
+    sources[name] = maker
 }
 
-export function register_sink(name: string, maker: (str: string) => PipelineComponent) {
-  sinks[name] = maker
+export function register_sink(maker: (str: string) => PipelineComponent, ...mimes: string[]) {
+  for (var name of mimes)
+    sinks[name] = maker
 }
