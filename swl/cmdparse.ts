@@ -116,7 +116,7 @@ const PIPE = P.seqMap(
 )
 
 const SPACE = R(/\s/)
-const OPTS_MARKER = R(/@/)
+const OPTS_MARKER = R(/%/)
 
 export const URI = AnythingBut(SPACE, OPTS_MARKER)
 
@@ -133,7 +133,7 @@ export const URI_WITH_OPTS = P.seqMap(
   __,
   URI,
   Either(
-    P.seqMap(S`?`, OBJECT, P.optWhitespace ,(_q, ob) => ob),
+    P.seqMap(OPTS_MARKER, OBJECT, P.optWhitespace ,(_q, ob) => ob),
     __.map(_ => null)
   ),
   (_1, uri, opts) => [uri, opts || {}] as [string, {[name: string]: any}]
@@ -145,7 +145,7 @@ export const ADAPTER_AND_OPTIONS = P.seqMap(
   P.optWhitespace,
   URI,
   Either(
-    P.seqMap(S`?`, OBJECT, P.optWhitespace ,(_q, ob) => ob),
+    P.seqMap(OPTS_MARKER, OBJECT, P.optWhitespace ,(_q, ob) => ob),
     P.optWhitespace.map(_ => null)
   ),
   P.all,

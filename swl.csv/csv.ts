@@ -1,7 +1,8 @@
 import {StreamSink, StreamSource, register_sink, URI_WITH_OPTS, make_write_creator, register_source, make_read_creator} from 'swl'
 
 import * as stringify from 'csv-stringify'
-import * as yup from 'yup'
+import * as parse from 'csv-parse'
+import * as y from 'yup'
 
 export interface CsvAdapterOptions {
   encoding?: string
@@ -11,10 +12,10 @@ export interface CsvAdapterOptions {
 
 export class CsvOutput extends StreamSink {
 
-  schema = yup.object({
-    encoding: yup.string().default('utf-8'),
-    header: yup.boolean().default(true),
-    delimiter: yup.string().default(';')
+  schema = y.object({
+    encoding: y.string().default('utf-8'),
+    header: y.boolean().default(true),
+    delimiter: y.string().default(';')
   })
 
   options = this.schema.cast(this.options)
@@ -37,9 +38,22 @@ register_sink(async (opts: any, str: string) => {
 
 export class CsvSource extends StreamSource {
 
+  schema = y.object({
+    columns: y.boolean().default(true),
+    delimiter: y.string().default(','),
+    auto_parse: y.boolean().default(true)
+  })
+  options = this.schema.cast(this.options)
+
+  codec() {
+    return parse(this.options)
+  }
+
 }
 
 register_source(async (opts: any, rest: string) => {
   const [uri, options] = URI_WITH_OPTS.tryParse(rest)
+  options.encoding = 'utf-8'
+  // console.log(uri, options)
   return new CsvSource(opts, await make_read_creator(uri, options || {}))
 }, 'csv', '.csv')

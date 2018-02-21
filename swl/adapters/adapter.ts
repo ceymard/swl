@@ -126,35 +126,36 @@ export class Source extends PipelineComponent {
 }
 
 
-export class StreamSource extends Source {
+export abstract class StreamSource extends Source {
 
-  ended = false
   _codec: NodeJS.ReadWriteStream | null = null
 
   constructor(options: any, public source: NodeJS.ReadableStream) {
     super(options)
-    source.on('end', () => {
-      this.ended = true
-    })
   }
 
   /**
    * Set a codec on this stream source
    * @param codec The codec to set this source to.
    */
-  codec(codec: NodeJS.ReadWriteStream) {
-    this.source = this.source.pipe(codec)
-  }
+  abstract async codec(): Promise<NodeJS.ReadWriteStream>
 
   async *emit(): AsyncIterableIterator<PipelineEvent> {
     var res: any
-    while ( (res = this.source.read()) ) {
+    var ended = false
+    const src = this.source.pipe(await this.codec())
+    yield this.start((this.source as NodeJS.ReadStream).path)
+    src.on("end", () => { ended = true })
+    do {
+      // console.log('??')
+
+      res = src.read()
       if (res != null)
         yield this.data(res)
-      if (this.ended)
+      if (ended)
         return
-      await resume_once(this.source, 'readable')
-    }
+      await resume_once(src, 'readable')
+    } while (true)
   }
 
 }
