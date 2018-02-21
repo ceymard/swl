@@ -26,7 +26,6 @@ async function run() {
   if (fragments.length < 2) throw new Error(`Need a pipeline`)
 
   for (var f of fragments) {
-    // console.log(f)
     const [name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
     const handler = f.type === 'source' ? sources[name] : sinks[name]
 

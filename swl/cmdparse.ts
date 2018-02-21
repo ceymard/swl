@@ -7,6 +7,16 @@ function S(t: TemplateStringsArray) {
 }
 
 const R = P.regexp
+const __ = P.optWhitespace
+
+function AnythingBut(...parsers: P.Parser<any>[]): P.Parser<string> {
+  return P.seq(...parsers.map(p => P.notFollowedBy(p)), P.any)
+    .map((res: any[]) => res[res.length - 1] as string)
+    .many().map(s => s.join(''))
+}
+
+const Either = P.alt
+const Sequence = P.seq
 
 
 const re_date = /(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?/
@@ -23,8 +33,8 @@ const SINGLE_VALUE = R(/[^,\}\]\s]+/).map(res => {
 const re_regexp = /r'([^']+)'([imguy]*)/
 
 const QUOTED = R(/'[^']*'|"[^"]*"/).map(res => res.slice(1, -1))
-const TRUE = P.alt(S`true`, S`yes`).map(_ => true)
-const FALSE = P.alt(S`false`, S`no`).map(_ => false)
+const TRUE = Either(S`true`, S`yes`).map(_ => true)
+const FALSE = Either(S`false`, S`no`).map(_ => false)
 const REGEXP = R(re_regexp).map(r => {
   const [src, flags] = re_regexp.exec(r)!.slice(1)
   return new RegExp(src, flags||'')
@@ -36,9 +46,11 @@ const DATE = R(re_date).map(r => {
 
 })
 
-const VALUE: P.Parser<any> = P.alt(
-  P.seqMap(S`[`, P.sepBy(P.lazy(() => VALUE), S`,`), S`]`, (_1, res, _2) => res),
-  P.seqMap(S`{`, P.lazy(() => OBJECT), S`}`, (_1, res, _2) => res),
+const VALUE: P.Parser<any> = Either(
+  Sequence(S`[`, P.sepBy(P.lazy(() => VALUE), S`,`), S`]`)
+    .map(([_1, res, _2]) => res),
+  Sequence(S`{`, P.lazy(() => OBJECT), S`}`)
+    .map(([_1, res, _2]) => res),
   TRUE,
   FALSE,
   DATE,
@@ -47,28 +59,26 @@ const VALUE: P.Parser<any> = P.alt(
   SINGLE_VALUE
 )
 
-const BOOL_PROP = P.seqMap(
-  P.alt(
-    P.seq(P.optWhitespace, R(/not?\s+/)),
+const BOOL_PROP = Sequence(
+  Either(
+    Sequence(__, R(/not?\s+/)),
     S`!`,
-    P.seq(P.optWhitespace, R(/don'?t\s+/)),
+    Sequence(__, R(/don'?t\s+/)),
     S``
   ),
   R(/[^,\)\]\s]+/),
-  (no, val) => { return {[val]: !no} }
-)
+).map(([no, val]) => { return {[val]: !no} })
 
-const PROP = P.seqMap(
+const PROP = Sequence(
   R(/\w+/),
   S`:`,
-  VALUE,
-  (name, _, val) => { return {[name]: val} }
-)
+  VALUE
+).map(([name, _, val]) => { return {[name]: val} })
 
 // const value = P.any(date, prop)
 
 export const OBJECT: P.Parser<{[name: string]: any}> =
-  P.sepBy1(P.alt(PROP, BOOL_PROP), S`,`)
+  P.sepBy1(Either(PROP, BOOL_PROP), S`,`)
   .map(res => Object.assign({}, ...res))
 
 
@@ -88,14 +98,7 @@ const SOURCE_DIVIDER = S`-:`
 
 // const SINGLE = P.regex(/[^\?]+\?/)
 
-const INSTRUCTION = P.seqMap(
-  P.notFollowedBy(DIVIDER),
-  P.notFollowedBy(SOURCE_DIVIDER),
-  P.any,
-  (...r: (string | null)[]) => r[r.length -1] as string
-).many().map(s => {
-  return s.join('').trim()
-})
+const INSTRUCTION = AnythingBut(DIVIDER, SOURCE_DIVIDER)
 
 const SOURCE = P.seqMap(SOURCE_DIVIDER, INSTRUCTION, (_, inst) => { return {type: 'source', inst} })
 const SINK = P.seqMap(
@@ -104,7 +107,7 @@ const SINK = P.seqMap(
   (_, inst) => { return {type: 'sink', inst} }
 )
 
-const INST = P.alt(SOURCE, SINK)
+const INST = Either(SOURCE, SINK)
 
 const PIPE = P.seqMap(
   INSTRUCTION.map(inst => { return {type: 'source', inst} }),
@@ -112,7 +115,10 @@ const PIPE = P.seqMap(
   (i, m) => [i, ...m]
 )
 
-export const URI = P.regex(/(\\\?|\\\s|[^\?\s])+/)
+const SPACE = R(/\s/)
+const OPTS_MARKER = R(/@/)
+
+export const URI = AnythingBut(SPACE, OPTS_MARKER)
 
 export const URI_AND_OBJ = P.seqMap(
   P.optWhitespace,
@@ -124,11 +130,11 @@ export const URI_AND_OBJ = P.seqMap(
 )
 
 export const URI_WITH_OPTS = P.seqMap(
-  P.optWhitespace,
+  __,
   URI,
-  P.alt(
+  Either(
     P.seqMap(S`?`, OBJECT, P.optWhitespace ,(_q, ob) => ob),
-    P.optWhitespace.map(_ => null)
+    __.map(_ => null)
   ),
   (_1, uri, opts) => [uri, opts || {}] as [string, {[name: string]: any}]
 )
@@ -138,7 +144,7 @@ export const PARSER = PIPE
 export const ADAPTER_AND_OPTIONS = P.seqMap(
   P.optWhitespace,
   URI,
-  P.alt(
+  Either(
     P.seqMap(S`?`, OBJECT, P.optWhitespace ,(_q, ob) => ob),
     P.optWhitespace.map(_ => null)
   ),
