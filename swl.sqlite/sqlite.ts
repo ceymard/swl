@@ -1,5 +1,5 @@
 
-import {Source, PipelineEvent, PipelineComponent, register_source, URI_AND_OBJ} from 'swl'
+import {Source, PipelineEvent, PipelineComponent, register_source, URI_AND_OBJ, register_sink, URI} from 'swl'
 import * as S from 'better-sqlite3'
 
 
@@ -124,3 +124,9 @@ export class SqliteSink extends PipelineComponent {
   }
 
 }
+
+register_sink(async (opts: any, parse: string) => {
+  const file = URI.tryParse(parse)
+  // console.log(file, sources)
+  return new SqliteSink(file, opts)
+}, 'sqlite')

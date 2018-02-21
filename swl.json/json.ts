@@ -6,7 +6,7 @@ export class InlineJson extends Source {
   objects: any[]
 
   constructor(public options: any, public body: string) {
-    super()
+    super(options)
     this.objects = JSON.parse(`[${body}]`)
   }
 

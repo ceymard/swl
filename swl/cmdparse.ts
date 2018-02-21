@@ -83,13 +83,18 @@ export const OBJ = P.seqMap(
 export type PipelineContent = string | string[]
 export type Pipeline = PipelineContent[]
 
-const DIVIDER = S`|`
-const SOURCE_DIVIDER = S`|<`
+const DIVIDER = S`::`
+const SOURCE_DIVIDER = S`-:`
 
 // const SINGLE = P.regex(/[^\?]+\?/)
 
-const INSTRUCTION = P.regex(/([^\[\]\|]+)/).map(s => {
-  return s.trim()
+const INSTRUCTION = P.seqMap(
+  P.notFollowedBy(DIVIDER),
+  P.notFollowedBy(SOURCE_DIVIDER),
+  P.any,
+  (...r: (string | null)[]) => r[r.length -1] as string
+).many().map(s => {
+  return s.join('').trim()
 })
 
 const SOURCE = P.seqMap(SOURCE_DIVIDER, INSTRUCTION, (_, inst) => { return {type: 'source', inst} })
@@ -107,7 +112,7 @@ const PIPE = P.seqMap(
   (i, m) => [i, ...m]
 )
 
-export const URI = P.regex(/(\\\?|\\\s|[^\?\s]+)/)
+export const URI = P.regex(/(\\\?|\\\s|[^\?\s])+/)
 
 export const URI_AND_OBJ = P.seqMap(
   P.optWhitespace,
