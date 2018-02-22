@@ -27,12 +27,13 @@ async function run() {
     }
     return
   }
-  if (fragments.length === 1) {
-    fragments.push({
-      type: 'sink',
-      inst: 'debug'
-    })
-  }
+  // if (fragments.length === 1) {
+  // Maybe should check if there is not a debug already present
+  fragments.push({
+    type: 'sink',
+    inst: 'debug'
+  })
+  // }
 
   for (var f of fragments) {
     const [name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
