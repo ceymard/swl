@@ -43,10 +43,11 @@ export class CsvSource extends StreamSource {
     delimiter: y.string().default(','),
     auto_parse: y.boolean().default(true)
   })
+
   options = this.schema.cast(this.options)
 
-  codec() {
-    return parse(this.options)
+  async nextSource(source: NodeJS.ReadableStream) {
+    return source.pipe(parse(this.options))
   }
 
 }

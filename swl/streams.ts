@@ -1,4 +1,5 @@
 import {createWriteStream, createReadStream} from 'fs'
+import {Sources} from './adapters'
 
 export async function make_write_creator(uri: string, options: any) {
   // Check for protocol !!
@@ -10,7 +11,12 @@ export async function make_write_creator(uri: string, options: any) {
   }
 }
 
-export async function make_read_creator(uri: string, options: any) {
+import * as path from 'path'
+
+export async function *make_read_creator(uri: string, options: any): Sources {
   // Check for protocol !!
-  return createReadStream(uri, options) as NodeJS.ReadableStream
+  yield {
+    collection: path.basename(uri).replace(/\.[^\.]+$/, ''),
+    source: createReadStream(uri, options) as NodeJS.ReadableStream
+  }
 }

@@ -2,7 +2,6 @@
 (Symbol as any).asyncIterator = Symbol.asyncIterator || Symbol.for("Symbol.asyncIterator");
 
 import {EventEmitter} from 'events'
-import { PassThrough } from 'stream';
 
 export type EventType =
     'start'
@@ -34,13 +33,6 @@ export interface ExecEvent extends PipelineEventBase {
 }
 
 export type PipelineEvent = StartEvent | DataEvent | ExecEvent
-
-// export interface PipelineEvent {
-//   type: EventType
-//   cleared_on?: {[pipe_id: string]: true}
-//   emitter: string
-//   payload: any
-// }
 
 
 export type WriteStreamCreator = (colname: string) => Promise<NodeJS.WritableStream> | NodeJS.WritableStream
@@ -127,42 +119,57 @@ export class Source extends PipelineComponent {
 }
 
 
+export type Sources = AsyncIterableIterator<{
+  collection: string
+  source: NodeJS.ReadableStream
+}>
+
+
 export class StreamSource extends Source {
 
-  _codec: NodeJS.ReadWriteStream | null = null
+  ended = false
+  collection: string = ''
+  source!: NodeJS.ReadableStream
 
-  constructor(options: any, public source: NodeJS.ReadableStream) {
+  constructor(options: any, public sources: Sources) {
     super(options)
   }
 
   /**
-   * Set a codec on this stream source
-   * @param codec The codec to set this source to.
+   *
+   * @param source
    */
-  async codec(): Promise<NodeJS.ReadWriteStream> {
-    return new PassThrough()
+  async nextSource(source: NodeJS.ReadableStream): Promise<NodeJS.ReadableStream> {
+    return source
   }
 
-  async *handleChunk(chk: any): AsyncIterableIterator<PipelineEvent> {
-    yield this.data(chk)
+  async read(): Promise<any | null> {
+    do {
+      var res = this.source.read()
+      if (res !== null)
+        return res
+      if (this.ended)
+        return null
+      await resume_once(this.source, 'readable')
+    } while (true)
+  }
+
+  async *handleSource(): AsyncIterableIterator<PipelineEvent> {
+    var res
+    yield this.start(this.collection)
+    while ((res = await this.read()) !== null) {
+      yield this.data(res)
+    }
   }
 
   async *emit(): AsyncIterableIterator<PipelineEvent> {
-    var res: any
-    var ended = false
-    const src = this.source.pipe(await this.codec())
-    yield this.start((this.source as NodeJS.ReadStream).path)
-    src.on("end", () => { ended = true })
-    do {
-      // console.log('??')
-
-      res = src.read()
-      if (res != null)
-        yield* this.handleChunk(res)
-      if (ended)
-        return
-      await resume_once(src, 'readable')
-    } while (true)
+    // const src = this.source.pipe(await this.codec())
+    for await (var src of this.sources) {
+      this.collection = src.collection
+      this.source = await this.nextSource(src.source)
+      this.source.on('end', () => this.ended = true)
+      yield* this.handleSource()
+    }
   }
 
 }

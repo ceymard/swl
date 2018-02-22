@@ -1,4 +1,4 @@
-import {Source, PipelineEvent, register_source, StreamSource, make_read_creator, StreamSink, PipelineComponent, WriteStreamCreator, resume_once} from 'swl'
+import {Source, PipelineEvent, register_source, StreamSource, make_read_creator, StreamSink, PipelineComponent, WriteStreamCreator, resume_once, register_sink, make_write_creator, URI_WITH_OPTS} from 'swl'
 
 var id = 0
 export class InlineJson extends Source {
@@ -22,47 +22,48 @@ export class InlineJson extends Source {
 
 export class JsonSource extends StreamSource {
 
-  tmp = ''
-  pos = 0
-  count = 0
-  obj_start = 0
-
-  async *handleChunk(chk: any): AsyncIterableIterator<PipelineEvent> {
-    const st: string = chk instanceof Buffer ? chk.toString('utf-8') : chk as string
+  async *handleSource(): AsyncIterableIterator<PipelineEvent> {
     var in_string = false
     var in_obj = false
+    var chunk
+    var tmp = ''
+    var pos = 0
+    var count = 0
+    var obj_start = 0
+    yield this.start(this.collection)
+    while ( (chunk = await this.read()) !== null) {
+      const st: string = chunk instanceof Buffer ? chunk.toString('utf-8') : chunk as string
+      tmp += st
 
-    this.tmp += st
-    var pos = this.pos, tmp = this.tmp, count = this.count
-    for (; pos < tmp.length; pos++) {
-      if (!in_string) {
-        if (tmp[pos] === '{') {
-          in_obj = true
-          if (count === 0)
-            this.obj_start = pos
-          count += 1
-        } else if (tmp[pos] === '}') {
-          count -= 1
-          in_obj = false
-          if (count === 0) {
-            var obj = tmp.slice(this.obj_start, pos - this.obj_start + 2)
-            // console.log(obj)
-            yield this.data(JSON.parse(obj))
-            // We remove the excess object and start again
-            tmp = this.tmp = this.tmp.slice(pos + 1)
-            pos = -1
+      for (; pos < tmp.length; pos++) {
+        if (!in_string) {
+          if (tmp[pos] === '{') {
+            in_obj = true
+            if (count === 0)
+              obj_start = pos
+            count += 1
+          } else if (tmp[pos] === '}') {
+            count -= 1
+            in_obj = false
+            if (count === 0) {
+              var obj = tmp.slice(obj_start, pos - obj_start + 1)
+              // console.log(obj)
+              yield this.data(JSON.parse(obj))
+              // We remove the excess object and start again
+              tmp = tmp.slice(pos + 1)
+              pos = -1
+            }
+          } else if (in_obj && tmp[pos] === '"') {
+            in_string = true
           }
-        } else if (in_obj && tmp[pos] === '"') {
-          in_string = true
-        }
-      } else {
-        if (in_obj && tmp[pos] === '"' && tmp[pos - 1] !== '\\') {
-          in_string = false
+        } else {
+          if (in_obj && tmp[pos] === '"' && tmp[pos - 1] !== '\\') {
+            in_string = false
+          }
         }
       }
+
     }
-    this.pos = pos
-    this.count = count
   }
 
 }
@@ -94,7 +95,9 @@ export class JsonSink extends PipelineComponent {
         close()
 
         var new_writable = await this.creator(ev.name)
-        if (new_writable !== writable) {
+        var diff = new_writable !== writable
+        writable = new_writable
+        if (diff) {
           if (this.options.object) {
             if (start = true)
               await write(`{`)
@@ -132,3 +135,8 @@ register_source(async (opts:any, str: string) => {
   'application/ld+json',
   'application/vnd.geo+json'
 )
+
+register_sink(async (opts: any, str: string) => {
+  const [uri, options] = URI_WITH_OPTS.tryParse(str)
+  return new JsonSink(opts, await make_write_creator(uri, options))
+}, 'json', '.json')
