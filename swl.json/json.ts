@@ -74,4 +74,12 @@ register_source(async (opts: any, str: string) => {
 
 register_source(async (opts:any, str: string) => {
   return new JsonSource(opts, await make_read_creator(str.trim(), {}))
-}, 'json')
+},
+  'json',
+  '.json',
+  'text/json',
+  'application/json',
+  'application/javascript',
+  'application/ld+json',
+  'application/vnd.geo+json'
+)
