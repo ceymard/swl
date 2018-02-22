@@ -1,4 +1,4 @@
-import {Source, PipelineEvent, register_source, StreamSource, make_read_creator} from 'swl'
+import {Source, PipelineEvent, register_source, StreamSource, make_read_creator, StreamSink, PipelineComponent, WriteStreamCreator, resume_once} from 'swl'
 
 var id = 0
 export class InlineJson extends Source {
@@ -63,6 +63,52 @@ export class JsonSource extends StreamSource {
     }
     this.pos = pos
     this.count = count
+  }
+
+}
+
+
+export class JsonSink extends PipelineComponent {
+
+  constructor(options: any, public creator: WriteStreamCreator) {
+    super(options)
+  }
+
+  async *process(): AsyncIterableIterator<PipelineEvent> {
+    var stream: NodeJS.WritableStream | undefined
+    var writable: NodeJS.WritableStream | undefined
+    var start = true
+
+    function close() {
+      if (writable) writable.end()
+      if (stream) stream.end()
+    }
+
+    async function write(str: string) {
+      if (!writable!.write(str))
+      await resume_once(writable!, 'drain')
+    }
+
+    for await (var ev of this.upstream()) {
+      if (ev.type === 'start') {
+        close()
+
+        var new_writable = await this.creator(ev.name)
+        if (new_writable !== writable) {
+          if (this.options.object) {
+            if (start = true)
+              await write(`{`)
+            await write(`"${ev.name}":[`)
+          } else {
+
+          }
+        }
+      } else if (ev.type === 'data') {
+        await write(JSON.stringify(ev.payload))
+      }
+    }
+
+    close()
   }
 
 }

@@ -46,7 +46,7 @@ export type PipelineEvent = StartEvent | DataEvent | ExecEvent
 export type WriteStreamCreator = (colname: string) => Promise<NodeJS.WritableStream> | NodeJS.WritableStream
 
 
-async function resume_once(em: EventEmitter, event: string) {
+export async function resume_once(em: EventEmitter, event: string) {
   var acc: Function
   const prom = new Promise((accept) => {
     acc = accept
