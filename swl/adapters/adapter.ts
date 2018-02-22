@@ -2,6 +2,7 @@
 (Symbol as any).asyncIterator = Symbol.asyncIterator || Symbol.for("Symbol.asyncIterator");
 
 import {EventEmitter} from 'events'
+import { PassThrough } from 'stream';
 
 export type EventType =
     'start'
@@ -126,7 +127,7 @@ export class Source extends PipelineComponent {
 }
 
 
-export abstract class StreamSource extends Source {
+export class StreamSource extends Source {
 
   _codec: NodeJS.ReadWriteStream | null = null
 
@@ -138,7 +139,13 @@ export abstract class StreamSource extends Source {
    * Set a codec on this stream source
    * @param codec The codec to set this source to.
    */
-  abstract async codec(): Promise<NodeJS.ReadWriteStream>
+  async codec(): Promise<NodeJS.ReadWriteStream> {
+    return new PassThrough()
+  }
+
+  async *handleChunk(chk: any): AsyncIterableIterator<PipelineEvent> {
+    yield this.data(chk)
+  }
 
   async *emit(): AsyncIterableIterator<PipelineEvent> {
     var res: any
@@ -151,7 +158,7 @@ export abstract class StreamSource extends Source {
 
       res = src.read()
       if (res != null)
-        yield this.data(res)
+        yield* this.handleChunk(res)
       if (ended)
         return
       await resume_once(src, 'readable')
