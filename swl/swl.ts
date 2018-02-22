@@ -13,7 +13,7 @@ async function run() {
   // console.log(fragments)
   const pipe = []
 
-  if (fragments.length < 2) {
+  if (fragments.length < 1) {
     console.log(`Available source adapters:`)
     for (var x in sources) {
       if (x.indexOf('.') === 0 || x.indexOf('/') > -1) continue
@@ -26,6 +26,12 @@ async function run() {
       console.log(`  - ${x}`)
     }
     return
+  }
+  if (fragments.length === 1) {
+    fragments.push({
+      type: 'sink',
+      inst: 'debug'
+    })
   }
 
   for (var f of fragments) {
