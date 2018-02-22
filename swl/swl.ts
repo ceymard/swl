@@ -14,7 +14,7 @@ async function run() {
   // console.log(fragments)
   const pipe = []
 
-  if (fragments.length < 1) {
+  if (fragments.length < 1 || fragments[0].inst.trim() === '') {
     console.log(`Available source adapters:`)
     for (var x in sources) {
       if (x.indexOf('.') === 0 || x.indexOf('/') > -1) continue
