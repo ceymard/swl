@@ -105,6 +105,9 @@ export class JsonSink extends PipelineComponent {
         }
       } else if (ev.type === 'data') {
         await write(JSON.stringify(ev.payload))
+      } else {
+        // Other events should still go down the drain
+        yield ev
       }
     }
 
