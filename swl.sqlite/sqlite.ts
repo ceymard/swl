@@ -37,7 +37,7 @@ export class SqliteSource extends Source {
       var stmt = db.prepare(sql)
 
       yield this.start(colname)
-      for (var s of stmt.iterate()) {
+      for (var s of (stmt as any).iterate()) {
         yield this.data(s)
       }
     }
@@ -49,7 +49,7 @@ register_source(async (opts: any, parse: string) => {
   const [file, sources] = URI_AND_OBJ.tryParse(parse)
   // console.log(file, sources)
   return new SqliteSource(opts, file, sources)
-}, 'sqlite')
+}, 'sqlite', '.sqlite', 'sqlite3', '.db')
 
 
 export class SqliteSink extends PipelineComponent {
@@ -129,4 +129,4 @@ register_sink(async (opts: any, parse: string) => {
   const file = URI.tryParse(parse)
   // console.log(file, sources)
   return new SqliteSink(file, opts)
-}, 'sqlite')
+}, 'sqlite', '.sqlite', 'sqlite3', '.db')

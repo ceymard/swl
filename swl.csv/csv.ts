@@ -40,7 +40,7 @@ export class CsvSource extends StreamSource {
 
   schema = y.object({
     columns: y.boolean().default(true),
-    delimiter: y.string().default(','),
+    delimiter: y.string().default(';'),
     auto_parse: y.boolean().default(true)
   })
 

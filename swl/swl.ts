@@ -41,11 +41,16 @@ async function run() {
     var handler = f.type === 'source' ? sources[name] : sinks[name]
 
     if (!handler) {
+      // If we didn't have any handler, just guess the handler
+      // from the file extension (may not work well !)
       var c = pth.parse(name)
       handler = f.type === 'source' ? sources[c.ext] : sinks[c.ext]
       rest = name + ' ' + rest
       // console.log(name)
     }
+
+    if (!handler)
+      throw new Error(`No handler for "${name}"`)
 
     // console.log(name, handler)
     // Check that handler exists !
