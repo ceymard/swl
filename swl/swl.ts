@@ -4,6 +4,7 @@
 // import {PARSER as OPARSER} from './oparse'
 // import {Adapter, registry} from './adapters'
 import {PARSER, pipeline, sources, sinks, ADAPTER_AND_OPTIONS} from './lib'
+import * as pth from 'path'
 
 const args = process.argv.slice(2).join(' ')
 // console.log(args)
@@ -36,8 +37,15 @@ async function run() {
   // }
 
   for (var f of fragments) {
-    const [name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
-    const handler = f.type === 'source' ? sources[name] : sinks[name]
+    var [name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
+    var handler = f.type === 'source' ? sources[name] : sinks[name]
+
+    if (!handler) {
+      var c = pth.parse(name)
+      handler = f.type === 'source' ? sources[c.ext] : sinks[c.ext]
+      rest = name + ' ' + rest
+      // console.log(name)
+    }
 
     // console.log(name, handler)
     // Check that handler exists !
