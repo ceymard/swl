@@ -1,5 +1,5 @@
 
-import {Source, PipelineEvent, PipelineComponent, register_source, URI_AND_OBJ, register_sink, URI} from 'swl'
+import {Source, PipelineEvent, Sink, register_source, URI_AND_OBJ, register_sink, URI} from 'swl'
 import * as S from 'better-sqlite3'
 
 
@@ -52,7 +52,7 @@ register_source(async (opts: any, parse: string) => {
 }, 'sqlite', '.sqlite', 'sqlite3', '.db')
 
 
-export class SqliteSink extends PipelineComponent {
+export class SqliteSink extends Sink {
 
   mode: 'insert' | 'upsert' | 'update' = 'insert'
   db!: S

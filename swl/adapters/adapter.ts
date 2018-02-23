@@ -59,9 +59,9 @@ export async function resume_once(em: EventEmitter, ...events: string[]) {
 
 
 
-export class PipelineComponent {
+export class Sink {
 
-  public prev!: PipelineComponent
+  public prev!: Sink
   public sub_pipe_id: string = ''
   started = false
 
@@ -107,7 +107,7 @@ export class PipelineComponent {
 /**
  * A source only
  */
-export class Source extends PipelineComponent {
+export class Source extends Sink {
 
   /**
    * Method that the sources will have to implement.
@@ -188,7 +188,7 @@ export class StreamSource extends Source {
 }
 
 
-export abstract class StreamSink extends PipelineComponent {
+export abstract class StreamSink extends Sink {
 
   writable!: NodeJS.ReadWriteStream
   stream!: NodeJS.WritableStream
@@ -226,7 +226,7 @@ export abstract class StreamSink extends PipelineComponent {
 }
 
 
-export async function pipeline(first: PipelineComponent, ...rest: PipelineComponent[]) {
+export async function pipeline(first: Sink, ...rest: Sink[]) {
   var iter = first
   for (var r of rest) {
     r.prev = iter

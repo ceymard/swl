@@ -1,4 +1,4 @@
-import {PipelineComponent, PipelineEvent} from './adapter'
+import {Sink, PipelineEvent} from './adapter'
 import {inspect} from 'util'
 import {register_sink} from 'swl/register'
 import * as y from 'yup'
@@ -39,7 +39,7 @@ function print_value(out: NodeJS.WritableStream, obj: any, outside = true) {
   }
 }
 
-export class DebugAdapter extends PipelineComponent {
+export class DebugAdapter extends Sink {
 
   schema = y.object({
     data: y.boolean().default(true),

@@ -1,5 +1,5 @@
 
-import { PipelineComponent, PipelineEvent } from './adapter'
+import { Sink, PipelineEvent } from './adapter'
 import { register_sink } from 'swl/register'
 import * as y from 'yup'
 
@@ -17,7 +17,7 @@ function sanitize(str: string): string {
 /**
  * Sanitize string input
  */
-export class Sanitizer extends PipelineComponent {
+export class Sanitizer extends Sink {
 
   schema = y.object({
     columns: y.boolean().default(false),

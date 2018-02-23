@@ -1,7 +1,7 @@
-import {Source, PipelineComponent} from './adapters'
+import {Source, Sink} from './adapters'
 
 export type SourceMaker = (opts: any, str: string) => Promise<Source>
-export type SinkMaker = (opts: any, str: string) => Promise<PipelineComponent>
+export type SinkMaker = (opts: any, str: string) => Promise<Sink>
 export const sources: {[name: string]: SourceMaker} = {}
 export const sinks: {[name: string]: SinkMaker} = {}
 
