@@ -46,8 +46,7 @@ export class JsonSource extends StreamSource {
             count -= 1
             in_obj = false
             if (count === 0) {
-              var obj = tmp.slice(obj_start, pos - obj_start + 1)
-              // console.log(obj)
+              var obj = tmp.slice(obj_start, pos + 1)
               yield this.data(JSON.parse(obj))
               // We remove the excess object and start again
               tmp = tmp.slice(pos + 1)
