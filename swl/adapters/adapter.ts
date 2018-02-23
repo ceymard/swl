@@ -67,9 +67,7 @@ export class Sink {
 
   protected handlers = {}
 
-  constructor(public options: any) {
-
-  }
+  constructor(public options: any) { }
 
   start(name: string): StartEvent {
     return {type: 'start', name, emitter: this.constructor.name}
@@ -124,6 +122,20 @@ export class Source extends Sink {
     yield* this.emit()
   }
 
+}
+
+export class Transformer extends Sink {
+  async *process(): AsyncIterableIterator<PipelineEvent> {
+    for await (var ev of this.upstream()) {
+      if (ev.type === 'data') {
+        yield this.data(this.transform(ev.payload))
+      } else yield ev
+    }
+  }
+
+  transform(payload: any): any {
+    return payload
+  }
 }
 
 

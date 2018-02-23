@@ -1,9 +1,9 @@
 
-import {Sink, PipelineEvent} from './adapter'
+import {Sink, PipelineEvent, Transformer} from './adapter'
 import { register_sink } from 'swl/register';
 import { ARRAY_CONTENTS } from '../lib';
 
-export class Pluck extends Sink {
+export class Pluck extends Transformer {
 
   constructor(public def: any[]) {
     super({})
@@ -37,17 +37,41 @@ register_sink(async (opts: any, rest: string) => {
 }, 'pluck')
 
 
-export class Map extends Sink {
+export class JS extends Sink {
+  static doc = `Run a function for each data`
+
   constructor(public fn: (a: any) => any) {
     super({})
   }
 
   async *process(): AsyncIterableIterator<PipelineEvent> {
-
+    for await (var ev of this.upstream()) {
+      if (ev.type === 'data')
+        yield* this.fn(ev.payload)
+      else yield ev
+    }
   }
 }
 
+
+register_sink(async (opts: any, rest: string) => {
+
+  const fn = eval(`
+    var f = function *map(o) {
+      ${rest}
+    };
+    f
+  `)
+
+  var m = new JS(fn)
+  fn.bind(m)
+  return m
+}, 'js')
+
+
 export class On extends Sink {
+  doc = `Send an exec event downstream on a specific condition`
+
   constructor() {
     super({})
   }
