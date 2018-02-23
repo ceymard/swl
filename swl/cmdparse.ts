@@ -26,15 +26,15 @@ const SINGLE_VALUE = R(/[^,\}\]\s]+/).map(res => {
   if (num) {
     return parseFloat(num[0])
   }
-
+  var t = res.trim()
+  if (t === 'yes' || t === 'true') return true
+  if (t === 'no' || t === 'false') return false
   return res
 })
 
-const re_regexp = /r'([^']+)'([imguy]*)/
+const re_regexp = /\/([^']+)\/([imguy]*)/
 
 const QUOTED = R(/'[^']*'|"[^"]*"/).map(res => res.slice(1, -1))
-const TRUE = Either(S`true`, S`yes`).map(_ => true)
-const FALSE = Either(S`false`, S`no`).map(_ => false)
 const REGEXP = R(re_regexp).map(r => {
   const [src, flags] = re_regexp.exec(r)!.slice(1)
   return new RegExp(src, flags||'')
@@ -47,12 +47,9 @@ const DATE = R(re_date).map(r => {
 })
 
 const VALUE: P.Parser<any> = Either(
-  Sequence(S`[`, P.sepBy(P.lazy(() => VALUE), S`,`), S`]`)
-    .map(([_1, res, _2]) => res),
+  P.lazy(() => ARRAY),
   Sequence(S`{`, P.lazy(() => OBJECT), S`}`)
     .map(([_1, res, _2]) => res),
-  TRUE,
-  FALSE,
   DATE,
   QUOTED,
   REGEXP,
@@ -80,6 +77,13 @@ const PROP = Sequence(
 export const OBJECT: P.Parser<{[name: string]: any}> =
   P.sepBy1(Either(PROP, BOOL_PROP), S`,`)
   .map(res => Object.assign({}, ...res))
+
+export const ARRAY_VALUE = P.alt(
+  PROP, VALUE
+)
+
+export const ARRAY_CONTENTS = P.sepBy(ARRAY_VALUE, S`,`)
+export const ARRAY: P.Parser<any[]> = Sequence(S`[`, ARRAY_CONTENTS, S`]`).map(([_, ct, _2]) => ct)
 
 
 export const OBJ = P.seqMap(
