@@ -38,13 +38,21 @@ export type PipelineEvent = StartEvent | DataEvent | ExecEvent
 export type WriteStreamCreator = (colname: string) => Promise<NodeJS.WritableStream> | NodeJS.WritableStream
 
 
-export async function resume_once(em: EventEmitter, event: string) {
+export async function resume_once(em: EventEmitter, ...events: string[]) {
   var acc: Function
   const prom = new Promise((accept) => {
     acc = accept
   })
 
-  em.once(event, () => acc())
+  function handle() {
+    for (var e2 of events)
+      em.removeListener(e2, handle)
+    acc()
+  }
+
+  for (var e of events) {
+    em.on(e, handle)
+  }
 
   return prom
 }
@@ -148,9 +156,11 @@ export class StreamSource extends Source {
       var res = this.source.read()
       if (res !== null)
         return res
-      if (this.ended)
+      if (this.ended) {
+        // console.log('stream ended')
         return null
-      await resume_once(this.source, 'readable')
+      }
+      await resume_once(this.source, 'readable', 'end')
     } while (true)
   }
 
@@ -167,7 +177,10 @@ export class StreamSource extends Source {
     for await (var src of this.sources) {
       this.collection = src.collection
       this.source = await this.nextSource(src.source)
-      this.source.on('end', () => this.ended = true)
+      this.source.on('end', () => {
+        // console.log('ended ?')
+        this.ended = true
+      })
       yield* this.handleSource()
     }
   }

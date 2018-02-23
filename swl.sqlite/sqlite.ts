@@ -113,20 +113,17 @@ export class SqliteSink extends PipelineComponent {
         }
 
         stmt.run(...columns.map(c => payload[c]))
-
       } else if (ev.type === 'exec') {
         await (this as any)[ev.method](ev.options, ev.body)
       }
     }
-
     this.db.exec('COMMIT')
-
   }
 
 }
 
 register_sink(async (opts: any, parse: string) => {
-  const file = URI.tryParse(parse)
+  const file = URI.tryParse(parse.trim())
   // console.log(file, sources)
   return new SqliteSink(file, opts)
 }, 'sqlite', '.sqlite', 'sqlite3', '.db')
