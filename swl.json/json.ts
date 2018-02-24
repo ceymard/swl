@@ -1,4 +1,4 @@
-import {Source, PipelineEvent, register_source, StreamSource, make_read_creator, StreamSink, Sink, WriteStreamCreator, resume_once, register_sink, make_write_creator, URI_WITH_OPTS} from 'swl'
+import {Source, PipelineEvent, register_source, StreamSource, make_read_creator, Sink, WriteStreamCreator, resume_once, register_sink, make_write_creator, URI_WITH_OPTS} from 'swl'
 
 var id = 0
 export class InlineJson extends Source {
