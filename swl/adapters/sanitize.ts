@@ -9,7 +9,7 @@ function sanitize(str: string): string {
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "")
     // only keep ascii characters, numbers, and a few useful characters like punctutation
     .replace(/[^\w-_\/\\.!?,:; \s\n]/, '')
-    .replace(/[\n\s+]/m, ' ')
+    .replace(/[\n\s+]/gm, '_')
     .trim()
     .toLowerCase()
 }
@@ -22,7 +22,7 @@ export class Sanitizer extends Sink {
   schema = y.object({
     columns: y.boolean().default(false),
     collections: y.boolean().default(false),
-    values: y.boolean().default(true)
+    values: y.boolean().default(true),
   })
 
   options = this.schema.cast(this.options)
