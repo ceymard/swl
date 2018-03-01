@@ -96,13 +96,16 @@ export class SqliteSink extends Sink {
             )
           `)
 
-          if (this.mode === 'insert')
-            stmt = this.db.prepare(`INSERT INTO ${table}(${columns.map(c => `"${c}"`).join(', ')})
-              values (${columns.map(c => '?').join(', ')})`)
+          if (this.mode === 'insert') {
+            const sql = `INSERT INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
+            values (${columns.map(c => '?').join(', ')})`
+            // console.log(sql)
+            stmt = this.db.prepare(sql)
+          }
           else if (this.mode === 'upsert')
             // Should I do some sub-query thing with coalesce ?
             // I would need some kind of primary key...
-            stmt = this.db.prepare(`INSERT OR REPLACE INTO ${table}(${columns.map(c => `"${c}"`).join(', ')})
+            stmt = this.db.prepare(`INSERT OR REPLACE INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
               values (${columns.map(c => '?').join(', ')})`)
 
 
