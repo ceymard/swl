@@ -1,0 +1,13 @@
+{
+  "name": "swl.xlsx",
+  "version": "0.0.1",
+  "main": "xlsx.js",
+  "types": "xlsx.d.ts",
+  "scripts": {
+    "watch": "wtsc -w",
+    "build": "wtsc"
+  },
+  "dependencies": {
+    "xlsx": "^0.12.3"
+  }
+}

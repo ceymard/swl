@@ -17,5 +17,6 @@ try_require(
   'swl.sqlite',
   'swl.imap',
   'swl.mysql',
-  'swl.oracle'
+  'swl.oracle',
+  'swl.xlsx'
 )
