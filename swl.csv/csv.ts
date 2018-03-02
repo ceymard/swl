@@ -22,6 +22,8 @@ sources.add(
     const sources = await make_read_creator(uri, source_options || {})
 
     return async function *csv(upstream: ChunkIterator): ChunkIterator {
+      yield* upstream
+
       for await (var src of sources) {
         yield Chunk.start(src.collection)
         const stream = new StreamWrapper(src.source.pipe(parse(opts)))
