@@ -2,6 +2,7 @@
 (Symbol as any).asyncIterator = Symbol.asyncIterator || Symbol.for("Symbol.asyncIterator");
 
 import {EventEmitter} from 'events'
+import { register_sink } from 'swl/register';
 
 export type EventType =
     'start'
@@ -235,6 +236,25 @@ export abstract class StreamSink extends Sink {
     close()
   }
 
+}
+
+
+export function simple_transformer(fn: (opts: any, a: any) => any, ...mimes: string[]) {
+
+  class SimpleTransformer extends Sink {
+    async *process(): AsyncIterableIterator<PipelineEvent> {
+      const opts = this.options
+      for await (var ev of this.upstream()) {
+        if (ev.type === 'data') {
+          yield this.data(fn(opts, ev.payload))
+        } else yield ev
+      }
+    }
+  }
+
+  register_sink(async (opts: any) => {
+    return new SimpleTransformer(opts)
+  }, ...mimes)
 }
 
 

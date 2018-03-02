@@ -1,46 +1,10 @@
-import {PipelineEvent, Transformer} from './adapter'
-import { register_sink } from 'swl/register';
-import { flatten, unflatten } from 'flat'
+import { flatten as flt, unflatten as unflt } from 'flat'
+import { simple_transformer } from './adapter'
 
-export class Flatten extends Transformer {
-
-  constructor() {
-    super({})
-  }
-
-  async *process(): AsyncIterableIterator<PipelineEvent> {
-    for await (var ev of this.upstream()) {
-      if (ev.type === 'data') {
-        var p = ev.payload
-        yield this.data(flatten(p))
-      } else yield ev
-    }
-  }
-
-}
-
-register_sink(async () => {
-  return new Flatten()
+simple_transformer(function flatten(opts: any, a: any) {
+  return flt(a, opts)
 }, 'flatten')
 
-
-export class Unflatten extends Transformer {
-
-  constructor() {
-    super({})
-  }
-
-  async *process(): AsyncIterableIterator<PipelineEvent> {
-    for await (var ev of this.upstream()) {
-      if (ev.type === 'data') {
-        var p = ev.payload
-        yield this.data(unflatten(p))
-      } else yield ev
-    }
-  }
-
-}
-
-register_sink(async () => {
-  return new Unflatten()
+simple_transformer(function unflatten(opts: any, a: any) {
+  return unflt(a, opts)
 }, 'unflatten')
