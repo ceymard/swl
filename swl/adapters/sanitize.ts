@@ -20,9 +20,9 @@ function sanitize(str: string): string {
 export class Sanitizer extends Sink {
 
   schema = y.object({
-    columns: y.boolean().default(false),
-    collections: y.boolean().default(false),
-    values: y.boolean().default(true),
+    columns: y.boolean().default(true),
+    collections: y.boolean().default(true),
+    values: y.boolean().default(false),
   })
 
   options = this.schema.cast(this.options)
