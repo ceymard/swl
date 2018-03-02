@@ -12,7 +12,7 @@ export type EventType =
 
 export interface PipelineEventBase {
   type: EventType
-  emitter: string
+  emitter?: string
   // cleared_on?: {[pipe_id: string]: true}
 }
 
@@ -35,6 +35,17 @@ export interface ExecEvent extends PipelineEventBase {
 
 export type PipelineEvent = StartEvent | DataEvent | ExecEvent
 
+
+export namespace PipelineEvent {
+  export function start(name: string): StartEvent {
+    return {type: 'start', name}
+  }
+}
+
+
+export type Flow = AsyncIterableIterator<PipelineEvent>
+
+export type Node = (upstream: Flow) => Flow
 
 export type WriteStreamCreator = (colname: string) => Promise<NodeJS.WritableStream> | NodeJS.WritableStream
 

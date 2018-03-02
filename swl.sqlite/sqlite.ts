@@ -1,26 +1,19 @@
 
-import {Source, PipelineEvent, Sink, register_source, URI_AND_OBJ, register_sink, URI} from 'swl'
+import {Source, PipelineEvent, Sink, register_source, URI_AND_OBJ, register_sink, URI, sources, ChunkIterator, Chunk} from 'swl'
 import * as S from 'better-sqlite3'
 
 
-export type Selector = boolean | string
+sources.add(function sqlite(opts: any, rest: string) {
 
+  const [file, sources] = URI_AND_OBJ.tryParse(rest)
 
-export class SqliteSource extends Source {
+  return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {
+    yield* upstream
 
-  constructor(
-    public options: any,
-    public filename: string,
-    public sources: {[name: string]: Selector} = {}
-  ) {
-    super(options)
-  }
-
-  async *emit(): AsyncIterableIterator<PipelineEvent> {
-    const db = new S(this.filename, this.options)
+    const db = new S(file, opts)
     // Throw error if db doesn't exist ! (unless option specifically allows for that)
 
-    var keys = Object.keys(this.sources)
+    var keys = Object.keys(sources)
     if (keys.length === 0) {
       // Auto-detect *tables* (not views)
       const st = db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
@@ -28,7 +21,7 @@ export class SqliteSource extends Source {
     }
 
     for (var colname of keys) {
-      var val = this.sources[colname]
+      var val = sources[colname]
 
       var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
       : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
@@ -36,20 +29,15 @@ export class SqliteSource extends Source {
 
       var stmt = db.prepare(sql)
 
-      yield this.start(colname)
+      yield Chunk.start(colname)
       for (var s of (stmt as any).iterate()) {
-        yield this.data(s)
+        yield Chunk.data(s)
       }
     }
+
   }
 
-}
-
-register_source(async (opts: any, parse: string) => {
-  const [file, sources] = URI_AND_OBJ.tryParse(parse)
-  // console.log(file, sources)
-  return new SqliteSource(opts, file, sources)
-}, 'sqlite', '.sqlite', 'sqlite3', '.db')
+}, '.db', '.sqlite3', '.sqlite')
 
 
 /**

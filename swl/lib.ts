@@ -1,9 +1,10 @@
 if (process.env.DEBUG) require('source-map-support').install()
 
-export * from './adapters'
+// export * from './adapters'
 export * from './cmdparse'
-export * from './register'
+// export * from './register'
 export * from './streams'
+export * from './pipeline'
 
 function try_require(...names: string[]) {
   for (var name of names) try { require(name) } catch { }
