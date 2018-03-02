@@ -1,6 +1,14 @@
 
-import {Source, PipelineEvent, Sink, register_source, URI_AND_OBJ, register_sink, URI, sources, ChunkIterator, Chunk} from 'swl'
+import {URI_AND_OBJ, URI, sources, ChunkIterator, Chunk} from 'swl'
 import * as S from 'better-sqlite3'
+
+export const DATA = [
+  {
+    name: 'Avène',
+    logo: 'avene.png',
+    data: [23432, 23432, 23423, 234234,5435,435345, 345345, 345345, 345345, 345345, 345345, ...] // 24 entrées de volume
+  }
+]
 
 
 sources.add(function sqlite(opts: any, rest: string) {
@@ -43,6 +51,7 @@ sources.add(function sqlite(opts: any, rest: string) {
 /**
  * SQlite doesn't speak all the data values that we may have
  */
+/*
 export function coerce(value: any) {
   const typ = typeof value
   if (value === null || typ === 'string' || typ === 'number' || value instanceof Buffer) {
@@ -144,3 +153,5 @@ register_sink(async (opts: any, parse: string) => {
   // console.log(file, sources)
   return new SqliteSink(file, opts)
 }, 'sqlite', '.sqlite', 'sqlite3', '.db')
+
+*/
