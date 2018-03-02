@@ -16,7 +16,6 @@ sources.add(
     auto_parse: y.boolean().default(true)
   }),
   async function csv(opts, rest) {
-
     const [uri, source_options] = URI_WITH_OPTS.tryParse(rest)
     source_options.encoding = 'utf-8'
     const sources = await make_read_creator(uri, source_options || {})

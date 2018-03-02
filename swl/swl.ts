@@ -48,6 +48,7 @@ async function run() {
     // pipe.push(await handler(opts || {}, rest))
 
   }
+
   await build_pipeline(pipe)
   // await pipeline(pipe[0], ...pipe.slice(1))
 }
