@@ -17,8 +17,10 @@
     "yup": "^0.24.1"
   },
   "devDependencies": {
+    "@types/flat": "^0.0.28",
     "@types/node": "^9.4.6",
     "@types/parsimmon": "^1.6.1",
-    "@types/yup": "^0.24.1"
+    "@types/yup": "^0.24.1",
+    "flat": "^4.0.0"
   }
 }

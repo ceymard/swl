@@ -20,3 +20,64 @@ export async function *make_read_creator(uri: string, options: any): Sources {
     source: createReadStream(uri, options) as NodeJS.ReadableStream
   }
 }
+
+
+
+
+export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStream> {
+
+  _error: any = undefined
+  _ended: boolean = false
+
+  constructor(public stream: T) {
+
+  }
+
+  async resume_once(...events: string[]) {
+    var acc: Function
+    const prom = new Promise((accept) => {
+      acc = accept
+    })
+
+    const em = this.stream
+    function handle() {
+      for (var e2 of events)
+        em.removeListener(e2, handle)
+      acc()
+    }
+
+    for (var e of events) {
+      em.on(e, handle)
+    }
+
+    return prom
+  }
+
+  /**
+   *
+   */
+  async read<U extends NodeJS.ReadableStream>(this: StreamWrapper<U>) {
+    do {
+      var res = this.stream.read()
+      if (res !== null)
+        return res
+      if (this._error) {
+        throw this._error
+      }
+      if (this._ended) {
+        // console.log('stream ended')
+        return null
+      }
+      await this.resume_once('readable', 'end', 'error')
+    } while (true)
+
+  }
+
+  /**
+   * Write data to the streama
+   */
+  async write<U extends NodeJS.WritableStream>(this: StreamWrapper<U>, data: any) {
+    await this.resume_once('drain')
+  }
+
+}

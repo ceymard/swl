@@ -1,31 +1,41 @@
 
 import {Source, PipelineEvent, Sink, register_source, URI_AND_OBJ, register_sink, URI} from 'swl'
-import * as S from 'better-sqlite3'
+import * as pg from 'pg'
 
 
 export type Selector = boolean | string
 
 
-export class SqliteSource extends Source {
+export class PostgresSource extends Source {
 
   constructor(
     public options: any,
-    public filename: string,
+    public uri: string,
     public sources: {[name: string]: Selector} = {}
   ) {
     super(options)
   }
 
   async *emit(): AsyncIterableIterator<PipelineEvent> {
-    const db = new S(this.filename, this.options)
+    console.log(this.uri)
+    const uri = `postgres://${this.uri}`
+    const db = new pg.Client(uri)
+    await db.connect()
     // Throw error if db doesn't exist ! (unless option specifically allows for that)
 
     var keys = Object.keys(this.sources)
     if (keys.length === 0) {
-      // Auto-detect *tables* (not views)
-      const st = db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
-      keys = st.all().map(k => k.name)
+      const tables = await db.query(`
+        SELECT * FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_type = 'BASE TABLE'`)
+
+      for (let res of tables.rows) {
+        this.sources[res.table_name] = true
+      }
+      keys = Object.keys(this.sources)
     }
+    // console.log(this.sources)
 
     for (var colname of keys) {
       var val = this.sources[colname]
@@ -34,13 +44,15 @@ export class SqliteSource extends Source {
       : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
       : val
 
-      var stmt = db.prepare(sql)
+      const result = await db.query(sql)
 
       yield this.start(colname)
-      for (var s of (stmt as any).iterate()) {
+      for (var s of result.rows) {
         yield this.data(s)
       }
     }
+
+    await db.end()
   }
 
 }
@@ -48,37 +60,11 @@ export class SqliteSource extends Source {
 register_source(async (opts: any, parse: string) => {
   const [file, sources] = URI_AND_OBJ.tryParse(parse)
   // console.log(file, sources)
-  return new SqliteSource(opts, file, sources)
-}, 'sqlite', '.sqlite', 'sqlite3', '.db')
+  return new PostgresSource(opts, file, sources)
+}, 'postgres', 'pg')
 
 
-/**
- * SQlite doesn't speak all the data values that we may have
- */
-export function coerce(value: any) {
-  const typ = typeof value
-  if (value === null || typ === 'string' || typ === 'number' || value instanceof Buffer) {
-    return value
-  }
-  if (typ === 'boolean')
-    return value ? 'true' : 'false'
-  if (value === undefined)
-    return null
-
-  if (value instanceof Date)
-    return value.toUTCString()
-  if (Array.isArray(value))
-    return value.join(', ')
-
-  // console.log(value)
-  return value.toString()
-  // console.log(value)
-  // throw new Error(`Unknown type for value: ${value}`)
-}
-
-
-
-export class SqliteSink extends Sink {
+export class PostgresSink extends Sink {
 
   mode: 'insert' | 'upsert' | 'update' = 'insert'
   db!: S
@@ -141,7 +127,7 @@ export class SqliteSink extends Sink {
           start = false
         }
 
-        stmt.run(...columns.map(c => coerce(payload[c])))
+        stmt.run(...columns.map(c => payload[c]))
       } else if (ev.type === 'exec') {
         await (this as any)[ev.method](ev.options, ev.body)
       }
@@ -154,5 +140,5 @@ export class SqliteSink extends Sink {
 register_sink(async (opts: any, parse: string) => {
   const file = URI.tryParse(parse.trim())
   // console.log(file, sources)
-  return new SqliteSink(file, opts)
-}, 'sqlite', '.sqlite', 'sqlite3', '.db')
+  return new PostgresSink(file, opts)
+}, 'postgres', 'pg')

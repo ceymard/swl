@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "watch": "concurrently -c red,green,blue,yellow,magenta,cyan -n swl,csv,json,sqlite,xlsx 'cd swl && npm run watch' 'cd swl.csv && npm run watch' 'cd swl.json && npm run watch' 'cd swl.sqlite && npm run watch' 'cd swl.xlsx && npm run watch'"
+    "watch": "concurrently -c red,green,blue,yellow,magenta,cyan,orange -n swl,csv,json,sqlite,xlsx,postgres 'cd swl && npm run watch' 'cd swl.csv && npm run watch' 'cd swl.json && npm run watch' 'cd swl.sqlite && npm run watch' 'cd swl.xlsx && npm run watch' 'cd swl.postgres && npm run watch'"
   },
   "workspaces": [
     "./swl*"
