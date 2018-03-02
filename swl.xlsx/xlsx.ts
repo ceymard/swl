@@ -11,6 +11,8 @@ import {
   // URI
 } from 'swl'
 
+import * as y from 'yup'
+
 import * as XLSX from 'xlsx'
 
 
@@ -37,16 +39,24 @@ function get_stream(stream: NodeJS.ReadableStream): Promise<Buffer> {
   return p
 }
 
+const _l = ['', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+const columns: string[] = []
 
-export function findTableRange() {
-
+for (let i = 0; i < _l.length; i++) {
+  for (let j = 1; j < _l.length; j++) {
+    columns.push(_l[i] + _l[j])
+  }
 }
-
 
 export class XlsxSource extends Source {
 
+  schema = y.object({
+    header: y.string()
+  })
+  options = this.schema.cast(this.options)
+
   constructor(
-    public options: any,
+    options: any,
     public sources: Sources,
     public obs: {[name: string]: Selector} = {}
   ) {
@@ -54,8 +64,6 @@ export class XlsxSource extends Source {
   }
 
   async *emit(): AsyncIterableIterator<PipelineEvent> {
-    // yield this.start('zobi')
-    // yield this.data({a: 1, b: 2})
 
     for await (const src of this.sources) {
       // console.log(src)
@@ -64,14 +72,55 @@ export class XlsxSource extends Source {
       // console.log(wp)
 
       for (var sname of w.SheetNames) {
-        // console.log(sname)
         yield this.start(sname)
         const s = w.Sheets[sname]
-        for (var obj of XLSX.utils.sheet_to_json(s)) {
-          yield this.data(obj)
+
+        // Find out if this sheet should be part of the extraction
+        if (Object.keys(this.obs).length > 0 && !this.obs[sname])
+          // If there was a specification of keys and this sheet name is not
+          // one of it, then just continue to the next collection
+          continue
+
+        const re_range = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/
+        const match = re_range.exec(s['!ref'] as string)
+        if (!match) continue
+
+        // We have to figure out the number of lines
+        const lines = parseInt(match[4])
+
+        // Then we want to find the header row. By default it should be
+        // "A1", or the first non-empty cell we find
+        const header: string[] = []
+        for (var i = 1; i < columns.length; i++) {
+          const cell = s[`${columns[i]}3`]
+          if (!cell)
+            break
+          header.push(cell.v)
         }
-        // console.log(s['A1'].v)
-        // yield this.data({a: 1, b: 2})
+
+        // Now that we've got the header, we just go on with the rest of the lines
+        var not_found_count = 0
+        for (var j = 4; j <= lines; j++) {
+          var obj: {[name: string]: any} = {}
+          var found = false
+          for (i = 1; i < header.length + 1; i++) {
+            const cell = s[`${columns[i]}${j}`]
+            if (cell) {
+              obj[header[i - 1]] = cell.v
+              found = true
+              not_found_count = 0
+            }
+          }
+
+          if (found)
+            yield this.data(obj)
+          else {
+            not_found_count++
+            if (not_found_count > 5)
+            // More than five empty rows in a row means we're at the end of the document.
+              break
+          }
+        }
       }
       // console.log(b.length)
     }
