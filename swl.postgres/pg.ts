@@ -1,7 +1,6 @@
 
-import {URI_AND_OBJ, sources, Chunk, ChunkIterator} from 'swl'
+import {URI_AND_OBJ, sources, Chunk, ChunkIterator, y} from 'swl'
 import * as pg from 'pg'
-import * as y from 'yup'
 
 // export type Selector = boolean | string
 

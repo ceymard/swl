@@ -1,3 +1,6 @@
+export const A = 5
+
+/*
 import {Source, PipelineEvent, register_source, StreamSource, make_read_creator, Sink, WriteStreamCreator, resume_once, register_sink, make_write_creator, URI_WITH_OPTS} from 'swl'
 
 var id = 0
@@ -139,3 +142,4 @@ register_sink(async (opts: any, str: string) => {
   const [uri, options] = URI_WITH_OPTS.tryParse(str)
   return new JsonSink(opts, await make_write_creator(uri, options))
 }, 'json', '.json')
+*/

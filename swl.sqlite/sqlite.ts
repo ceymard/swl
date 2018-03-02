@@ -1,7 +1,6 @@
 
-import {URI_AND_OBJ, URI, sources, ChunkIterator, Chunk} from 'swl'
+import {URI_AND_OBJ, y, sources, ChunkIterator, Chunk} from 'swl'
 import * as S from 'better-sqlite3'
-import * as y from 'yup'
 
 sources.add(
   y.object(),

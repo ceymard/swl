@@ -1,8 +1,7 @@
-import {StreamSink, StreamSource, register_sink, URI_WITH_OPTS, make_write_creator, register_source, make_read_creator} from 'swl'
+import { URI_WITH_OPTS, make_write_creator, make_read_creator, sources, y, ChunkIterator, Chunk, StreamWrapper} from 'swl'
 
 import * as stringify from 'csv-stringify'
 import * as parse from 'csv-parse'
-import * as y from 'yup'
 
 export interface CsvAdapterOptions {
   encoding?: string
@@ -10,6 +9,31 @@ export interface CsvAdapterOptions {
   delimiter?: string
 }
 
+sources.add(
+  y.object({
+    columns: y.boolean().default(true),
+    delimiter: y.string().default(';'),
+    auto_parse: y.boolean().default(true)
+  }),
+  async function csv(opts, rest) {
+
+    const [uri, source_options] = URI_WITH_OPTS.tryParse(rest)
+    source_options.encoding = 'utf-8'
+    const sources = await make_read_creator(uri, source_options || {})
+
+    return async function *csv(upstream: ChunkIterator): ChunkIterator {
+      for await (var src of sources) {
+        yield Chunk.start(src.collection)
+        const stream = new StreamWrapper(src.source.pipe(parse(opts)))
+        var value
+        while ( (value = await stream.read()) !== null ) {
+          yield Chunk.data(value)
+        }
+      }
+    }
+}, '.csv')
+
+/*
 export class CsvOutput extends StreamSink {
 
   schema = y.object({
@@ -58,3 +82,4 @@ register_source(async (opts: any, rest: string) => {
   // console.log(uri, options)
   return new CsvSource(opts, await make_read_creator(uri, options || {}))
 }, 'csv', '.csv')
+*/

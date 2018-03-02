@@ -8,6 +8,9 @@ export * from './streams'
 export * from './pipeline'
 export * from './sinks'
 
+import * as y from 'yup'
+export {y, y as yup}
+
 function try_require(...names: string[]) {
   for (var name of names) try { require(name) } catch { }
 }

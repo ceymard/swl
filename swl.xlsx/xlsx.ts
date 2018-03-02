@@ -1,4 +1,6 @@
+export const A = 5
 
+/*
 import {
   Source,
   PipelineEvent,
