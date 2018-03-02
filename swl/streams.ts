@@ -29,9 +29,7 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
   _error: any = undefined
   _ended: boolean = false
 
-  constructor(public stream: T) {
-
-  }
+  constructor(public stream: T, public collection?: string) { }
 
   async resume_once(...events: string[]) {
     var acc: Function

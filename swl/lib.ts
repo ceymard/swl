@@ -1,3 +1,4 @@
+(<any>Symbol).asyncIterator = Symbol.asyncIterator || Symbol.for("Symbol.asyncIterator")
 if (process.env.DEBUG) require('source-map-support').install()
 
 // export * from './adapters'
@@ -5,6 +6,7 @@ export * from './cmdparse'
 // export * from './register'
 export * from './streams'
 export * from './pipeline'
+export * from './sinks'
 
 function try_require(...names: string[]) {
   for (var name of names) try { require(name) } catch { }

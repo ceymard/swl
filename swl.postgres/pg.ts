@@ -1,29 +1,23 @@
 
-import {Source, PipelineEvent, Sink, register_source, URI_AND_OBJ, register_sink, URI} from 'swl'
+import {URI_AND_OBJ, sources, Chunk, ChunkIterator} from 'swl'
 import * as pg from 'pg'
+import * as y from 'yup'
 
+// export type Selector = boolean | string
 
-export type Selector = boolean | string
+sources.add(
+  y.object(),
+  function postgres(options, rest) {
+  var [uri, sources] = URI_AND_OBJ.tryParse(rest)
 
+  return async function *(upstream: ChunkIterator): ChunkIterator {
+    yield* upstream
 
-export class PostgresSource extends Source {
-
-  constructor(
-    public options: any,
-    public uri: string,
-    public sources: {[name: string]: Selector} = {}
-  ) {
-    super(options)
-  }
-
-  async *emit(): AsyncIterableIterator<PipelineEvent> {
-    console.log(this.uri)
-    const uri = `postgres://${this.uri}`
+    uri = `postgres://${uri}`
     const db = new pg.Client(uri)
     await db.connect()
-    // Throw error if db doesn't exist ! (unless option specifically allows for that)
 
-    var keys = Object.keys(this.sources)
+    var keys = Object.keys(sources)
     if (keys.length === 0) {
       const tables = await db.query(`
         SELECT * FROM information_schema.tables
@@ -31,14 +25,14 @@ export class PostgresSource extends Source {
           AND table_type = 'BASE TABLE'`)
 
       for (let res of tables.rows) {
-        this.sources[res.table_name] = true
+        sources[res.table_name] = true
       }
-      keys = Object.keys(this.sources)
+      keys = Object.keys(sources)
     }
-    // console.log(this.sources)
+    // console.log(sources)
 
     for (var colname of keys) {
-      var val = this.sources[colname]
+      var val = sources[colname]
 
       var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
       : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
@@ -46,24 +40,18 @@ export class PostgresSource extends Source {
 
       const result = await db.query(sql)
 
-      yield this.start(colname)
+      yield Chunk.start(colname)
       for (var s of result.rows) {
-        yield this.data(s)
+        yield Chunk.data(s)
       }
     }
 
     await db.end()
   }
-
-}
-
-register_source(async (opts: any, parse: string) => {
-  const [file, sources] = URI_AND_OBJ.tryParse(parse)
-  // console.log(file, sources)
-  return new PostgresSource(opts, file, sources)
-}, 'postgres', 'pg')
+})
 
 
+/*
 export class PostgresSink extends Sink {
 
   mode: 'insert' | 'upsert' | 'update' = 'insert'
@@ -142,3 +130,4 @@ register_sink(async (opts: any, parse: string) => {
   // console.log(file, sources)
   return new PostgresSink(file, opts)
 }, 'postgres', 'pg')
+*/

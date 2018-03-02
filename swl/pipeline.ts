@@ -41,12 +41,26 @@ export type ChunkIterator = AsyncIterableIterator<Chunk>
 
 export type Handler = (upstream: ChunkIterator) => ChunkIterator
 
-export type Factory = (options: any, rest: string) => Handler
+export type AsyncFactory<T> = (options: T, rest: string) => Promise<Handler>
+export type SyncFactory<T> = (options: T, rest: string) => Handler
+export type Factory<T> = SyncFactory<T> | AsyncFactory<T>
 
 
-export function build_pipeline(handlers: Handler[]) {
+export async function build_pipeline(handlers: Handler[]) {
+
+  async function *start_generator(): ChunkIterator {
+    return
+  }
   // Connect the handlers between themselves
+  // console.log('toto ?', handlers[0].name)
+  var handler = handlers[0](start_generator())
+  for (var h of handlers.slice(1)) {
+    handler = h(handler)
+  }
 
+  for await (var ch of handler) {
+    ch // useless.
+  }
 }
 
 
@@ -70,17 +84,32 @@ export function condition(fn: (a: any) => any, pipeline: ChunkIterator) {
 }
 
 
-export class FactoryContainer {
-  registry = {} as {[name: string]: Factory}
+import * as p from 'path'
+import { start } from 'repl';
+import * as y from 'yup'
 
-  add(factory: Factory, ...mimes: string[]) {
+export class FactoryContainer {
+  registry = {} as {[name: string]: {factory: Factory<any>, schema: y.ObjectSchema<any>} | undefined}
+
+  add<T>(schema: y.ObjectSchema<T>, factory: Factory<T>, ...mimes: string[]) {
     for (var name of [factory.name, ...mimes]) {
-      this.registry[name] = factory
+      this.registry[name] = {factory, schema}
     }
   }
 
-  get(name: string, options: any, rest: string) {
+  async get(name: string, options: any, rest: string) {
+    var handler = this.registry[name]
 
+    if (!handler) {
+      const a = p.parse(name)
+      handler = this.registry[a.ext]
+      rest = `${name} ${rest}`
+    }
+
+    if (!handler) throw new Error(`No handler for ${name}`)
+
+    var opts = handler.schema.cast(options)
+    return await handler.factory(opts, rest)
   }
 }
 

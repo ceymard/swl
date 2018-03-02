@@ -130,7 +130,7 @@ export const URI_AND_OBJ = P.seqMap(
   P.optWhitespace,
   OBJECT.atMost(1),
   P.optWhitespace,
-  (_, uri, _2, obj) => [uri, obj[0]] as [string, any]
+  (_, uri, _2, obj) => [uri, obj[0]||{}] as [string, any]
 )
 
 export const URI_WITH_OPTS = P.seqMap(

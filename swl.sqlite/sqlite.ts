@@ -1,17 +1,11 @@
 
 import {URI_AND_OBJ, URI, sources, ChunkIterator, Chunk} from 'swl'
 import * as S from 'better-sqlite3'
+import * as y from 'yup'
 
-export const DATA = [
-  {
-    name: 'Avène',
-    logo: 'avene.png',
-    data: [23432, 23432, 23423, 234234,5435,435345, 345345, 345345, 345345, 345345, 345345, ...] // 24 entrées de volume
-  }
-]
-
-
-sources.add(function sqlite(opts: any, rest: string) {
+sources.add(
+  y.object(),
+  function sqlite(opts, rest) {
 
   const [file, sources] = URI_AND_OBJ.tryParse(rest)
 
@@ -21,7 +15,7 @@ sources.add(function sqlite(opts: any, rest: string) {
     const db = new S(file, opts)
     // Throw error if db doesn't exist ! (unless option specifically allows for that)
 
-    var keys = Object.keys(sources)
+    var keys = Object.keys(sources||{})
     if (keys.length === 0) {
       // Auto-detect *tables* (not views)
       const st = db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
