@@ -1,5 +1,5 @@
 
-import {URI_AND_OBJ, y, sources, ChunkIterator, Chunk} from 'swl'
+import {URI_AND_OBJ, URI, y, sources, ChunkIterator, Chunk, sinks} from 'swl'
 import * as S from 'better-sqlite3'
 
 sources.add(
@@ -41,10 +41,77 @@ sources.add(
 }, '.db', '.sqlite3', '.sqlite')
 
 
-/**
- * SQlite doesn't speak all the data values that we may have
- */
-/*
+sinks.add(
+  y.object({
+    truncate: y.boolean().default(false)
+  }),
+  function sqlite(opts, rest) {
+    const file = URI.tryParse(rest.trim())
+    const mode: 'insert' | 'upsert' | 'update' = 'insert'
+
+    return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {
+      var table: string = ''
+      var columns: string[] = []
+      var start = false
+      var stmt: any
+
+      const db = new S(file, {})
+
+      db.exec('BEGIN')
+
+      for await (var ev of upstream) {
+        if (ev.type === 'start') {
+          start = true
+          table = ev.name
+        } else if (ev.type === 'data') {
+          var payload = ev.payload
+
+          // Check if we need to create the table
+          if (start) {
+            columns = Object.keys(payload)
+            var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
+            : payload[c] instanceof Buffer ? 'blob'
+            : 'text')
+            // Create if not exists ?
+            // Temporary ?
+            db.exec(`
+              CREATE TABLE IF NOT EXISTS "${table}" (
+                ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
+              )
+            `)
+
+            if (mode === 'insert') {
+              const sql = `INSERT INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
+              values (${columns.map(c => '?').join(', ')})`
+              // console.log(sql)
+              stmt = db.prepare(sql)
+            }
+            else if (mode === 'upsert')
+              // Should I do some sub-query thing with coalesce ?
+              // I would need some kind of primary key...
+              stmt = db.prepare(`INSERT OR REPLACE INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
+                values (${columns.map(c => '?').join(', ')})`)
+
+
+            if (opts.truncate) {
+              db.exec(`DELETE FROM "${table}"`)
+            }
+            start = false
+          }
+
+          stmt.run(...columns.map(c => coerce(payload[c])))
+
+        } else if (ev.type === 'exec') {
+          // await (this as any)[ev.method](ev.options, ev.body)
+        }
+      }
+      db.exec('COMMIT')
+    }
+  },
+  '.db', '.sqlite3', '.sqlite'
+)
+
+
 export function coerce(value: any) {
   const typ = typeof value
   if (value === null || typ === 'string' || typ === 'number' || value instanceof Buffer) {
@@ -60,91 +127,5 @@ export function coerce(value: any) {
   if (Array.isArray(value))
     return value.join(', ')
 
-  // console.log(value)
-  return value.toString()
-  // console.log(value)
-  // throw new Error(`Unknown type for value: ${value}`)
+  return JSON.stringify(value)
 }
-
-
-
-export class SqliteSink extends Sink {
-
-  mode: 'insert' | 'upsert' | 'update' = 'insert'
-  db!: S
-
-  constructor(public filename: string, public options: any = {}) {
-    super(options)
-  }
-
-  run(options: any, body: string) {
-    this.db.exec(body)
-  }
-
-  async *process(): AsyncIterableIterator<PipelineEvent> {
-    var table: string = ''
-    var columns: string[] = []
-    var start = false
-    var stmt: any
-
-    this.db = new S(this.filename, {})
-
-    this.db.exec('BEGIN')
-
-    for await (var ev of this.upstream()) {
-      if (ev.type === 'start') {
-        start = true
-        table = ev.name
-      } else if (ev.type === 'data') {
-        var payload = ev.payload
-
-        // Check if we need to create the table
-        if (start) {
-          columns = Object.keys(payload)
-          var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
-          : payload[c] instanceof Buffer ? 'blob'
-          : 'text')
-          // Create if not exists ?
-          // Temporary ?
-          this.db.exec(`
-            CREATE TABLE IF NOT EXISTS "${table}" (
-              ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
-            )
-          `)
-
-          if (this.mode === 'insert') {
-            const sql = `INSERT INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
-            values (${columns.map(c => '?').join(', ')})`
-            // console.log(sql)
-            stmt = this.db.prepare(sql)
-          }
-          else if (this.mode === 'upsert')
-            // Should I do some sub-query thing with coalesce ?
-            // I would need some kind of primary key...
-            stmt = this.db.prepare(`INSERT OR REPLACE INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
-              values (${columns.map(c => '?').join(', ')})`)
-
-
-          if (this.options.truncate) {
-            this.db.exec(`DELETE FROM "${table}"`)
-          }
-          start = false
-        }
-
-        stmt.run(...columns.map(c => coerce(payload[c])))
-      } else if (ev.type === 'exec') {
-        await (this as any)[ev.method](ev.options, ev.body)
-      }
-    }
-    this.db.exec('COMMIT')
-  }
-
-}
-
-register_sink(async (opts: any, parse: string) => {
-  const file = URI.tryParse(parse.trim())
-  // console.log(file, sources)
-  return new SqliteSink(file, opts)
-}, 'sqlite', '.sqlite', 'sqlite3', '.db')
-
-*/
