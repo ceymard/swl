@@ -5,14 +5,17 @@ import * as y from 'yup'
 
 sources.add(
   y.object({}),
-  function inline_json(opts, rest) {
+  function inline(opts, rest) {
 
     rest = rest.trim()
     if (rest[0] !== '[')
       rest = `[${rest}]`
+
+    const collection = eval(rest)
+
     return async function *inline_json(upstream: ChunkIterator): ChunkIterator {
       yield* upstream
-      for (var c of rest) {
+      for (var c of collection) {
         yield Chunk.data(c)
       }
     }
