@@ -57,7 +57,7 @@ sources.add(
 
       for await (var s of sources) {
         yield Chunk.start(s.collection)
-        handleSource(new StreamWrapper(s.source))
+        yield* handleSource(new StreamWrapper(s.source))
       }
     }
 
