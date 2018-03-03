@@ -67,6 +67,7 @@ export class Lock<T = void> {
 export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStream> {
 
   _ended: boolean = false
+  should_drain = false
   ended = new Lock()
   readable = new Lock()
   drained = new Lock()
@@ -111,7 +112,17 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
    * Write data to the streama
    */
   async write<U extends NodeJS.WritableStream>(this: StreamWrapper<U>, data: any) {
-    await this.drained.promise
+    if (this.should_drain) {
+      await this.drained.promise
+      this.should_drain = false
+    }
+
+    if (!this.stream.write(data))
+      this.should_drain = true
+  }
+
+  close<U extends NodeJS.WritableStream>(this: StreamWrapper<U>) {
+    this.stream.end()
   }
 
 }

@@ -43,7 +43,7 @@ sources.add(
 
 sinks.add(
   y.object({
-    truncate: y.boolean().default(false)
+    truncate: y.boolean().default(false),
   }),
   function sqlite(opts, rest) {
     const file = URI.tryParse(rest.trim())

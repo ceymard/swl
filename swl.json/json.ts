@@ -1,4 +1,99 @@
-export const A = 5
+
+import {sources, ChunkIterator, Chunk, StreamWrapper, URI_WITH_OPTS, make_read_creator, sinks, make_write_creator} from 'swl'
+import * as y from 'yup'
+
+sources.add(
+  y.object({}),
+  function json (opts, rest) {
+    const [uri, options] = URI_WITH_OPTS.tryParse(rest)
+    const sources = make_read_creator(uri, options)
+
+    async function *handleSource(sw: StreamWrapper<any>): ChunkIterator {
+      var in_string = false
+      var in_obj = false
+      var chunk
+      var tmp = ''
+      var pos = 0
+      var count = 0
+      var obj_start = 0
+      // yield Chunk.start(this.collection)
+      while ( (chunk = await sw.read()) !== null) {
+        const st: string = chunk instanceof Buffer ? chunk.toString('utf-8') : chunk as string
+        tmp += st
+
+        for (; pos < tmp.length; pos++) {
+          if (!in_string) {
+            if (tmp[pos] === '{') {
+              in_obj = true
+              if (count === 0)
+                obj_start = pos
+              count += 1
+            } else if (tmp[pos] === '}') {
+              count -= 1
+              in_obj = false
+              if (count === 0) {
+                var obj = tmp.slice(obj_start, pos + 1)
+                yield Chunk.data(JSON.parse(obj))
+                // We remove the excess object and start again
+                tmp = tmp.slice(pos + 1)
+                pos = -1
+              }
+            } else if (in_obj && tmp[pos] === '"') {
+              in_string = true
+            }
+          } else {
+            if (in_obj && tmp[pos] === '"' && tmp[pos - 1] !== '\\') {
+              in_string = false
+            }
+          }
+        }
+
+      }
+
+    }
+
+    return async function *json(upstream: ChunkIterator): ChunkIterator {
+      yield* upstream
+
+      for await (var s of sources) {
+        yield Chunk.start(s.collection)
+        handleSource(new StreamWrapper(s.source))
+      }
+    }
+
+  },
+  '.json'
+)
+
+
+sinks.add(
+  y.object({}),
+  function json(opts, rest) {
+    const [uri, options] = URI_WITH_OPTS.tryParse(rest)
+
+
+    return async function *json(upstream): ChunkIterator {
+
+      var wr!: StreamWrapper<NodeJS.WritableStream>
+      var creator = await make_write_creator(uri, options)
+
+      for await (var chk of upstream) {
+
+        if (chk.type === 'start') {
+          const collection = chk.name
+          const w = creator(collection)
+          wr = new StreamWrapper(w)
+        } else if (chk.type === 'data') {
+          await wr.write(JSON.stringify(chk.payload))
+        } else yield chk
+      }
+
+    }
+
+  },
+  '.json'
+)
+
 
 /*
 import {Source, PipelineEvent, register_source, StreamSource, make_read_creator, Sink, WriteStreamCreator, resume_once, register_sink, make_write_creator, URI_WITH_OPTS} from 'swl'
