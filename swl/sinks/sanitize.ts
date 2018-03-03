@@ -6,7 +6,7 @@ function san(str: string): string {
   // Remove accents
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "")
     // only keep ascii characters, numbers, and a few useful characters like punctutation
-    .replace(/[^\w-_\/\\.!?,:; \s\n]/, '')
+    .replace(/[^\w-_\/\\.!?,:; \s\n\{\}]/, '')
     .replace(/[\n\s+]/gm, '_')
     .trim()
     .toLowerCase()
