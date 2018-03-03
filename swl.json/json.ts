@@ -2,6 +2,24 @@
 import {sources, ChunkIterator, Chunk, StreamWrapper, URI_WITH_OPTS, make_read_creator, sinks, make_write_creator} from 'swl'
 import * as y from 'yup'
 
+
+sources.add(
+  y.object({}),
+  function inline_json(opts, rest) {
+
+    rest = rest.trim()
+    if (rest[0] !== '[')
+      rest = `[${rest}]`
+    return async function *inline_json(upstream: ChunkIterator): ChunkIterator {
+      yield* upstream
+      for (var c of rest) {
+        yield Chunk.data(c)
+      }
+    }
+  }
+)
+
+
 sources.add(
   y.object({}),
   function json (opts, rest) {
