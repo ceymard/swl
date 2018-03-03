@@ -47,6 +47,9 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
     for (var e of events) {
       em.on(e, handle)
     }
+    em.on('end', () => {
+      this._ended = true
+    })
 
     return prom
   }
