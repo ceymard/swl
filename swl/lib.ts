@@ -6,7 +6,7 @@ export * from './cmdparse'
 // export * from './register'
 export * from './streams'
 export * from './pipeline'
-export * from './sinks'
+import './sinks'
 
 import * as y from 'yup'
 export {y, y as yup}

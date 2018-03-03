@@ -98,7 +98,7 @@ export type PipelineContent = string | string[]
 export type Pipeline = PipelineContent[]
 
 const DIVIDER = S`::`
-const SOURCE_DIVIDER = S`-:`
+const SOURCE_DIVIDER = S`++`
 
 // const SINGLE = P.regex(/[^\?]+\?/)
 
