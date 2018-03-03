@@ -1,4 +1,4 @@
 import './debug'
-import './pluck'
+import './pick'
 import './sanitize'
 import './flat'
