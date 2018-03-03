@@ -1,3 +1,4 @@
+import { Lock } from './streams'
 
 export type ChunkType =
 'start'
@@ -46,7 +47,7 @@ export type SyncFactory<T> = (options: T, rest: string) => Handler
 export type Factory<T> = SyncFactory<T> | AsyncFactory<T>
 
 
-export async function build_pipeline(handlers: Handler[]) {
+export function build_pipeline(handlers: Handler[]) {
 
   async function *start_generator(): ChunkIterator {
     return
@@ -58,10 +59,7 @@ export async function build_pipeline(handlers: Handler[]) {
     handler = h(handler)
   }
 
-  for await (var ch of handler) {
-    ch // useless.
-  }
-
+  return handler
 }
 
 
@@ -69,11 +67,25 @@ export async function build_pipeline(handlers: Handler[]) {
  * Conditional pipeline. If the condition is met, then the value travels down
  * another subpipeline
  */
-export function condition(fn: (a: any) => any, pipeline: ChunkIterator) {
+export function condition(fn: (a: any) => any, handlers: Handler[]) {
+
+  const lock = new Lock<any>()
+  const end = Symbol()
+  async function *fake_source(): ChunkIterator {
+    do {
+      var res = await lock.promise
+    } while (res !== end)
+  }
+
+  handlers.unshift(fake_source)
+  const pipeline = build_pipeline(handlers)
+
   return async function *condition(upstream: ChunkIterator): ChunkIterator {
     for await (var chk of upstream) {
       if (fn(chk)) {
-        const res = await pipeline.next(chk)
+        // FIXME feed the pipeline
+        lock.resolve(chk)
+        const res = await pipeline.next()
         if (res.done)
           return
         yield res.value
@@ -81,6 +93,12 @@ export function condition(fn: (a: any) => any, pipeline: ChunkIterator) {
         yield chk
       }
     }
+    // Once upstream is done, we send end down the pipeline
+    // which should trigger the end of the fake_source and thus
+    // trigger the possible sources that were inside this pipe.
+    lock.resolve(end)
+    // We now yield the rest of the pipeline
+    yield* pipeline
   }
 }
 
@@ -88,15 +106,31 @@ export function condition(fn: (a: any) => any, pipeline: ChunkIterator) {
 import * as p from 'path'
 import * as y from 'yup'
 
+/**
+ * We use this class to store named factories so that the command
+ * parser find them.
+*/
 export class FactoryContainer {
   registry = {} as {[name: string]: {factory: Factory<any>, schema: y.ObjectSchema<any>} | undefined}
 
+  /**
+   * Add a factory to the registry
+   * @param schema A schema for the options that this factory accepts
+   * @param factory The factory function
+   * @param mimes Extensions or mime types that this handler accepts
+   */
   add<T>(schema: y.ObjectSchema<T>, factory: Factory<T>, ...mimes: string[]) {
     for (var name of [factory.name, ...mimes]) {
       this.registry[name] = {factory, schema}
     }
   }
 
+  /**
+   * Get a handler
+   * @param name The name, extension or mimetype of the handler
+   * @param options Provided options to the factory
+   * @param rest The rest of the command line string
+   */
   async get(name: string, options: any, rest: string) {
     var handler = this.registry[name]
 

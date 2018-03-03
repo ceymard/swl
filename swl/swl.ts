@@ -49,7 +49,10 @@ async function run() {
 
   }
 
-  await build_pipeline(pipe)
+  const pipeline = build_pipeline(pipe)
+  do {
+    var res = await pipeline.next()
+  } while (!res.done)
   // await pipeline(pipe[0], ...pipe.slice(1))
 }
 
