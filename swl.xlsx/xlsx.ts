@@ -68,14 +68,30 @@ sources.add(
           const match = re_range.exec(s['!ref'] as string)
           if (!match) continue
 
+          // Try to figure out if we were given a header position globally
+          // or for this specific sheet
+          var header_line = 1
+          var header_column = 1
+
+          const re_header = /^([A-Z]+)(\d+)$/
+          const hd = opts.header || sources[sname]
+          if (typeof hd === 'string') {
+            var m = re_header.exec(hd)
+            if (m) {
+              header_column = columns.indexOf(m[1])
+              header_line = parseInt(m[2])
+            }
+          }
+
           // We have to figure out the number of lines
           const lines = parseInt(match[4])
+
 
           // Then we want to find the header row. By default it should be
           // "A1", or the first non-empty cell we find
           const header: string[] = []
-          for (var i = 1; i < columns.length; i++) {
-            const cell = s[`${columns[i]}3`]
+          for (var i = header_column; i < columns.length; i++) {
+            const cell = s[`${columns[i]}${header_line}`]
             if (!cell)
               break
             header.push(cell.v)
@@ -83,7 +99,7 @@ sources.add(
 
           // Now that we've got the header, we just go on with the rest of the lines
           var not_found_count = 0
-          for (var j = 4; j <= lines; j++) {
+          for (var j = header_line + 1; j <= lines; j++) {
             var obj: {[name: string]: any} = {}
             var found = false
             for (i = 1; i < header.length + 1; i++) {
