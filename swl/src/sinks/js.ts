@@ -6,7 +6,7 @@ sinks.add(
   y.object({}),
   function js(opts, rest) {
 
-    var res: Function = eval(rest)
+    var fn: Function = eval(rest)
 
     return async function* (upstream: ChunkIterator): ChunkIterator {
       // yield* upstream
@@ -19,7 +19,15 @@ sinks.add(
           yield ch
         } else if (ch.type === 'data') {
           i++
-          yield Chunk.data(res(ch.payload, collection, i))
+          var res = fn(ch.payload, collection, i)
+          if (res[Symbol.iterator]) {
+            for (var r of res)
+              yield Chunk.data(r)
+          } else if (res[Symbol.asyncIterator]) {
+            for await (var r of res)
+              yield Chunk.data(r)
+          } else yield Chunk.data(res)
+
         } else yield ch
       }
     }
