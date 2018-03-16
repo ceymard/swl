@@ -1,4 +1,4 @@
-import { ChunkIterator, sinks, Chunk } from 'swl'
+import { ChunkIterator, sinks, Chunk } from '../pipeline'
 import * as y from 'yup'
 
 

@@ -2,14 +2,14 @@
   "name": "swl",
   "version": "0.0.1",
   "bin": {
-    "swl": "swl.js"
+    "swl": "./lib/swl.js"
   },
+  "main": "./lib/lib.js",
+  "types": "./lib/lib.d.ts",
   "scripts": {
     "watch": "wtsc -w",
     "build": "wtsc"
   },
-  "main": "lib.js",
-  "types": "lib.d.ts",
   "dependencies": {
     "chalk": "^2.3.1",
     "parsimmon": "^1.6.4",

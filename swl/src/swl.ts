@@ -4,7 +4,6 @@
 // import {PARSER as OPARSER} from './oparse'
 // import {Adapter, registry} from './adapters'
 import {PARSER, sources, sinks, ADAPTER_AND_OPTIONS, build_pipeline} from './lib'
-import * as pth from 'path'
 
 const args = process.argv.slice(2).join(' ')
 // console.log(args)

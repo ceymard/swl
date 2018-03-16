@@ -1,4 +1,4 @@
-import { ChunkIterator, sinks, Chunk } from 'swl'
+import { ChunkIterator, sinks, Chunk } from '../pipeline'
 import { flatten as f, unflatten as u } from 'flat'
 import * as y from 'yup'
 

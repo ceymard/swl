@@ -1,4 +1,5 @@
-import { ChunkIterator, sinks, Chunk, ARRAY_CONTENTS } from 'swl'
+import { ChunkIterator, sinks, Chunk } from '../pipeline'
+import { ARRAY_CONTENTS } from '../cmdparse'
 import * as y from 'yup'
 
 sinks.add(
