@@ -71,7 +71,7 @@ sources.add(
           // Try to figure out if we were given a header position globally
           // or for this specific sheet
           var header_line = 1
-          var header_column = 1
+          var header_column = 0
 
           const re_header = /^([A-Z]+)(\d+)$/
           const hd = opts.header || sources[sname]
@@ -85,7 +85,6 @@ sources.add(
 
           // We have to figure out the number of lines
           const lines = parseInt(match[4])
-
 
           // Then we want to find the header row. By default it should be
           // "A1", or the first non-empty cell we find
@@ -102,10 +101,10 @@ sources.add(
           for (var j = header_line + 1; j <= lines; j++) {
             var obj: {[name: string]: any} = {}
             var found = false
-            for (i = 1; i < header.length + 1; i++) {
+            for (i = header_column; i < header.length + 1; i++) {
               const cell = s[`${columns[i]}${j}`]
               if (cell) {
-                obj[header[i - 1]] = cell.v
+                obj[header[i - header_column]] = cell.v
                 found = true
                 not_found_count = 0
               }
