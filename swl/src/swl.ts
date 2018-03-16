@@ -4,12 +4,15 @@
 // import {PARSER as OPARSER} from './oparse'
 // import {Adapter, registry} from './adapters'
 import {PARSER, sources, sinks, ADAPTER_AND_OPTIONS, build_pipeline} from './lib'
+import { readFileSync } from 'fs'
 
-const args = process.argv.slice(2).join(' ')
+const args = process.argv.slice(2)
 // console.log(args)
 
 async function run() {
-  const fragments = PARSER.tryParse(args)
+const contents = args[0] !== '-f' ? args.join(' ') : readFileSync(args[1], 'utf-8').replace(/^\s*#[^\n]*$/gm, '')
+  // console.log(contents)
+  const fragments = PARSER.tryParse(contents)
   // console.log(fragments)
   const pipe = []
 
