@@ -107,6 +107,8 @@ sources.add(
                 obj[header[i - header_column]] = cell.v
                 found = true
                 not_found_count = 0
+              } else {
+                obj[header[i - header_column]] = null
               }
             }
 
