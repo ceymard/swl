@@ -43,7 +43,8 @@ sources.add(
 
 sinks.add(
   y.object({
-    truncate: y.boolean().default(false),
+    truncate: y.boolean().default(false).label('Truncate tables before loading'),
+    drop: y.boolean().default(false).label('Drop tables')
   }),
   function sqlite(opts, rest) {
     const file = URI.tryParse(rest.trim())
@@ -72,6 +73,11 @@ sinks.add(
             var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
             : payload[c] instanceof Buffer ? 'blob'
             : 'text')
+
+            if (opts.drop) {
+              db.exec(`DROP TABLE IF EXISTS "${table}"`)
+            }
+
             // Create if not exists ?
             // Temporary ?
             db.exec(`
