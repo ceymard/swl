@@ -34,7 +34,11 @@ const SINGLE_VALUE = R(/[^,\}\]\s]+/).map(res => {
 
 const re_regexp = /\/([^']+)\/([imguy]*)/
 
-const QUOTED = R(/'[^']*'|"[^"]*"/).map(res => res.slice(1, -1))
+const QUOTED = Either(
+  R(/'''((?!''')[^])*'''/m).map(res => res.slice(3, -3)),
+  R(/'[^']*'|"[^"]*"/m).map(res => res.slice(1, -1))
+)
+
 const REGEXP = R(re_regexp).map(r => {
   const [src, flags] = re_regexp.exec(r)!.slice(1)
   return new RegExp(src, flags||'')
