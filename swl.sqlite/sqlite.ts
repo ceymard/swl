@@ -44,21 +44,19 @@ sources.add(
 sinks.add(
   y.object({
     truncate: y.boolean().default(false).label('Truncate tables before loading'),
-    drop: y.boolean().default(false).label('Drop tables')
+    drop: y.boolean().default(false).label('Drop tables'),
+    pragma: y.boolean().default(true).label('Set pragmas before and revert them')
   }),
   function sqlite(opts, rest) {
     const file = URI.tryParse(rest.trim())
     const mode: 'insert' | 'upsert' | 'update' = 'insert'
 
-    return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {
+    async function* run(db: S, upstream: ChunkIterator): ChunkIterator {
+
       var table: string = ''
       var columns: string[] = []
       var start = false
       var stmt: any
-
-      const db = new S(file, {})
-
-      db.exec('BEGIN')
 
       for await (var ev of upstream) {
         if (ev.type === 'start') {
@@ -111,7 +109,41 @@ sinks.add(
           // await (this as any)[ev.method](ev.options, ev.body)
         }
       }
-      db.exec('COMMIT')
+
+    }
+
+    return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {
+
+      const db = new S(file, {})
+      var pragma_journal: string = 'delete'
+      var sync: number = 0
+      var locking_mode: string = 'exclusive'
+
+
+      if (opts.pragma) {
+        pragma_journal = db.pragma('journal_mode', true)
+        sync = db.pragma('synchronous', true)
+        locking_mode = db.pragma('locking_mode', true)
+
+        db.pragma('journal_mode = off')
+        db.pragma('synchronous = 0')
+        db.pragma('locking_mode = EXCLUSIVE')
+      }
+
+      db.exec('BEGIN')
+      try {
+        yield* run(db, upstream)
+        db.exec('COMMIT')
+      } catch (e) {
+        db.exec('ROLLBACK')
+        throw e
+      } finally {
+        db.pragma(`journal_mode = ${pragma_journal}`)
+        db.pragma(`synchronous = ${sync}`)
+        db.pragma(`locking_mode = ${locking_mode}`)
+      }
+
+      db.close()
     }
   },
   '.db', '.sqlite3', '.sqlite'
