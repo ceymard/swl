@@ -91,7 +91,7 @@ sources.add(
           const header: string[] = []
           for (var i = header_column; i < columns.length; i++) {
             const cell = s[`${columns[i]}${header_line}`]
-            if (!cell)
+            if (!cell || !cell.v)
               break
             header.push(cell.v)
           }
@@ -101,7 +101,7 @@ sources.add(
           for (var j = header_line + 1; j <= lines; j++) {
             var obj: {[name: string]: any} = {}
             var found = false
-            for (i = header_column; i < header.length + 1; i++) {
+            for (i = header_column; i < header.length; i++) {
               const cell = s[`${columns[i]}${j}`]
               if (cell) {
                 obj[header[i - header_column]] = cell.v
