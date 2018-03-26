@@ -71,7 +71,7 @@ const BOOL_PROP = Sequence(
 ).map(([no, val]) => { return {[val]: !no} })
 
 const PROP = Sequence(
-  R(/\w+/),
+  R(/[\w\.]+/),
   S`:`,
   VALUE
 ).map(([name, _, val]) => { return {[name]: val} })
