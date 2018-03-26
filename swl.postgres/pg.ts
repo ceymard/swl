@@ -53,6 +53,7 @@ sources.add(
 sinks.add(
   y.object({
     truncate: y.boolean().default(false).label('Truncate tables before loading'),
+    notice: y.boolean().default(true).label('Show notices on console'),
     drop: y.boolean().default(false).label('Drop tables'),
   }),
   function postgres(opts, rest) {
@@ -115,6 +116,7 @@ sinks.add(
           }
 
           await db.query({
+            name: query_name,
             text,
             values: columns.map(c => payload[c])
           })
@@ -131,6 +133,13 @@ sinks.add(
       const db = new pg.Client(`postgres://${uri}`)
       await db.connect()
 
+      if (opts.notice) {
+        db.on('notice', (notice: Error) => {
+          const _ = notice as Error & {severity: string}
+          console.log(`pg ${_.severity}: ${_.message}`)
+        })
+      }
+
       try {
         await db.query('BEGIN')
         yield* run(db, upstream)
@@ -139,9 +148,8 @@ sinks.add(
         await db.query('ROLLBACK')
         throw e
       } finally {
+        await db.end()
       }
-
-      await db.end()
     }
   }
 )
