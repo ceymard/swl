@@ -19,7 +19,8 @@ sources.add(
         yield Chunk.data(c)
       }
     }
-  }
+  },
+  'inline'
 )
 
 
@@ -83,7 +84,7 @@ sources.add(
     }
 
   },
-  '.json'
+  'json', '.json'
 )
 
 
@@ -112,7 +113,7 @@ sinks.add(
     }
 
   },
-  '.json'
+  'json', '.json'
 )
 
 

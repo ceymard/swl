@@ -31,7 +31,8 @@ sinks.add(
         } else yield ch
       }
     }
-  }
+  },
+  'js'
 )
 
 
@@ -64,5 +65,6 @@ sinks.add(
         } else yield ch
       }
     }
-  }
+  },
+  'jsobj'
 )

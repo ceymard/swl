@@ -120,7 +120,7 @@ export class FactoryContainer {
    * @param mimes Extensions or mime types that this handler accepts
    */
   add<T>(schema: y.ObjectSchema<T>, factory: Factory<T>, ...mimes: string[]) {
-    for (var name of [factory.name, ...mimes]) {
+    for (var name of mimes) {
       this.registry[name] = {factory, schema}
     }
   }

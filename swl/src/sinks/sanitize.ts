@@ -35,5 +35,6 @@ sinks.add(
         }
       }
     }
-  }
+  },
+  'sanitize'
 )

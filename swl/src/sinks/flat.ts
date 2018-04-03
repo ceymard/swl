@@ -15,7 +15,7 @@ sinks.add(
       }
     }
 
-  }
+  }, 'flatten'
 )
 
 sinks.add(
@@ -30,5 +30,5 @@ sinks.add(
       }
     }
 
-  }
+  }, 'unflatten'
 )

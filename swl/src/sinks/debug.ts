@@ -67,4 +67,4 @@ sinks.add(y.object({
       yield ch
     }
   }
-})
+}, 'debug')

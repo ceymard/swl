@@ -126,6 +126,5 @@ sources.add(
       }
 
     }
-  }, '.xlsx', '.xlsb', '.ods'
+  }, 'xlsx', '.xlsx', '.xlsb', '.ods'
 )
-

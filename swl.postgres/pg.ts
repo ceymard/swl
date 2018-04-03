@@ -47,7 +47,7 @@ sources.add(
 
     await db.end()
   }
-})
+}, 'postgres', 'pg')
 
 
 sinks.add(
@@ -151,5 +151,5 @@ sinks.add(
         await db.end()
       }
     }
-  }
+  }, 'postgres', 'pg'
 )

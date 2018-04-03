@@ -32,7 +32,7 @@ sources.add(
         }
       }
     }
-}, '.csv')
+}, 'csv', '.csv')
 
 
 sinks.add(
@@ -59,5 +59,5 @@ sinks.add(
         } else yield chk
       }
     }
-  }, '.csv'
+  }, 'csv', '.csv'
 )
