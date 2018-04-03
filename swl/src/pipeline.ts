@@ -106,6 +106,7 @@ export function condition(fn: (a: any) => any, handlers: Handler[]) {
 import * as p from 'path'
 import * as y from 'yup'
 
+
 /**
  * We use this class to store named factories so that the command
  * parser find them.
@@ -133,6 +134,15 @@ export class FactoryContainer {
    */
   async get(name: string, options: any, rest: string) {
     var handler = this.registry[name]
+
+    if (!handler) {
+      const re_uri = /^([\w]+):\/\//
+      const match = re_uri.exec(name)
+      if (match) {
+        handler = this.registry[match[1]]
+        rest = `${name.replace(match[0], '')} ${rest}`
+      }
+    }
 
     if (!handler) {
       const a = p.parse(name)
