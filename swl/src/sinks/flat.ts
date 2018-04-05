@@ -5,6 +5,7 @@ import * as y from 'yup'
 
 sinks.add(
   y.object(),
+  null,
   function flatten(opts) {
 
     return async function *flatten(upstream: ChunkIterator): ChunkIterator {
@@ -20,6 +21,7 @@ sinks.add(
 
 sinks.add(
   y.object(),
+  null,
   function unflatten(opts) {
 
     return async function *unflatten(upstream: ChunkIterator): ChunkIterator {

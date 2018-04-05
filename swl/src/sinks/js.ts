@@ -4,6 +4,7 @@ import * as y from 'yup'
 
 sinks.add(
   y.object({}),
+  null,
   function js(opts, rest) {
 
     var fn: Function = eval(rest)

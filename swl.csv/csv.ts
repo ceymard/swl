@@ -15,9 +15,9 @@ sources.add(
     delimiter: y.string().default(';'),
     auto_parse: y.boolean().default(true)
   }),
-  async function csv(opts, rest) {
-    const [uri, source_options] = URI_WITH_OPTS.tryParse(rest)
-    source_options.encoding = 'utf-8'
+  URI_WITH_OPTS,
+  async function csv(opts, [uri, source_options]) {
+    source_options.encoding = source_options.encoding || 'utf-8'
     const sources = await make_read_creator(uri, source_options || {})
 
     return async function *csv(upstream: ChunkIterator): ChunkIterator {
@@ -41,8 +41,8 @@ sinks.add(
     header: y.boolean().default(true),
     delimiter: y.string().default(';')
   }),
-  async function csv(opts, rest) {
-    const [uri, options] = URI_WITH_OPTS.tryParse(rest)
+  URI_WITH_OPTS,
+  async function csv(opts, [uri, options]) {
 
     return async function *csv(upstream: ChunkIterator): ChunkIterator {
       var w = await make_write_creator(uri, options)

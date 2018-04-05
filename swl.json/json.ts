@@ -5,6 +5,7 @@ import * as y from 'yup'
 
 sources.add(
   y.object({}),
+  null,
   function inline(opts, rest) {
 
     rest = rest.trim()
@@ -26,8 +27,8 @@ sources.add(
 
 sources.add(
   y.object({}),
-  function json (opts, rest) {
-    const [uri, options] = URI_WITH_OPTS.tryParse(rest)
+  URI_WITH_OPTS,
+  function json (opts, [uri, options]) {
     const sources = make_read_creator(uri, options)
 
     async function *handleSource(sw: StreamWrapper<any>): ChunkIterator {
@@ -90,9 +91,8 @@ sources.add(
 
 sinks.add(
   y.object({}),
-  function json(opts, rest) {
-    const [uri, options] = URI_WITH_OPTS.tryParse(rest)
-
+  URI_WITH_OPTS,
+  function json(opts, [uri, options]) {
 
     return async function *json(upstream): ChunkIterator {
 

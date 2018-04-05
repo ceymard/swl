@@ -4,8 +4,8 @@ import * as y from 'yup'
 
 sinks.add(
   y.object(),
-  function pick(opts, rest) {
-    const def = ARRAY_CONTENTS.tryParse(rest)
+  ARRAY_CONTENTS,
+  function pick(opts, def) {
 
     return async function *pick(upstream: ChunkIterator): ChunkIterator {
       for await (var ev of upstream) {

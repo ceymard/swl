@@ -1,4 +1,5 @@
 import { Lock } from './streams'
+import { Parser } from 'parsimmon'
 
 export type ChunkType =
 'start'
@@ -42,9 +43,9 @@ export type ChunkIterator = AsyncIterableIterator<Chunk>
 
 export type Handler = (upstream: ChunkIterator) => ChunkIterator
 
-export type AsyncFactory<T> = (options: T, rest: string) => Promise<Handler>
-export type SyncFactory<T> = (options: T, rest: string) => Handler
-export type Factory<T> = SyncFactory<T> | AsyncFactory<T>
+export type AsyncFactory<T, U> = (options: T, parsed: U) => Promise<Handler>
+export type SyncFactory<T, U> = (options: T, parsed: U) => Handler
+export type Factory<T, U> = SyncFactory<T, U> | AsyncFactory<T, U>
 
 
 export function build_pipeline(handlers: Handler[]) {
@@ -112,7 +113,11 @@ import * as y from 'yup'
  * parser find them.
 */
 export class FactoryContainer {
-  registry = {} as {[name: string]: {factory: Factory<any>, schema: y.ObjectSchema<any>} | undefined}
+  registry = {} as {[name: string]: {
+    factory: Factory<any, any>,
+    parser: Parser<any> | null
+    schema: y.ObjectSchema<any>
+  } | undefined}
 
   /**
    * Add a factory to the registry
@@ -120,9 +125,11 @@ export class FactoryContainer {
    * @param factory The factory function
    * @param mimes Extensions or mime types that this handler accepts
    */
-  add<T>(schema: y.ObjectSchema<T>, factory: Factory<T>, ...mimes: string[]) {
+  add<T, U>(schema: y.ObjectSchema<T>, parser: Parser<U>, factory: Factory<T, U>, ...mimes: string[]): void
+  add<T>(schema: y.ObjectSchema<T>, parser: null, factory: Factory<T, string>, ...mimes: string[]): void
+  add<T, U>(schema: y.ObjectSchema<T>, parser: null | Parser<U>, factory: Factory<T, U>, ...mimes: string[]) {
     for (var name of mimes) {
-      this.registry[name] = {factory, schema}
+      this.registry[name] = {factory, schema, parser}
     }
   }
 
@@ -153,7 +160,8 @@ export class FactoryContainer {
     if (!handler) throw new Error(`No handler for ${name}`)
 
     var opts = handler.schema.cast(options)
-    return await handler.factory(opts, rest)
+    var parsed = handler.parser ? handler.parser.tryParse(rest) : rest
+    return await handler.factory(opts, parsed)
   }
 }
 

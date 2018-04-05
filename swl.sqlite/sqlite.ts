@@ -4,9 +4,8 @@ import * as S from 'better-sqlite3'
 
 sources.add(
   y.object(),
-  function sqlite(opts, rest) {
-
-  const [file, sources] = URI_AND_OBJ.tryParse(rest)
+  URI_AND_OBJ,
+  function sqlite(opts, [file, sources]) {
 
   return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {
     yield* upstream
@@ -47,8 +46,8 @@ sinks.add(
     drop: y.boolean().default(false).label('Drop tables'),
     pragma: y.boolean().default(true).label('Set pragmas before and revert them')
   }),
-  function sqlite(opts, rest) {
-    const file = URI.tryParse(rest.trim())
+  URI,
+  function sqlite(opts, file) {
     const mode: 'insert' | 'upsert' | 'update' = 'insert'
 
     async function* run(db: S, upstream: ChunkIterator): ChunkIterator {

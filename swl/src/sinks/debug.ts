@@ -44,7 +44,8 @@ sinks.add(y.object({
     data: y.boolean().default(true),
     other: y.boolean().default(true)
   }),
-  function debug(opts, rest) {
+  null,
+  function debug(opts) {
 
   return async function *(upstream: ChunkIterator): ChunkIterator {
     var collection = ''

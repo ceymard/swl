@@ -6,8 +6,8 @@ import * as pg from 'pg'
 
 sources.add(
   y.object(),
-  function postgres(options, rest) {
-  var [uri, sources] = URI_AND_OBJ.tryParse(rest)
+  URI_AND_OBJ,
+  function postgres(options, [uri, sources]) {
 
   return async function *(upstream: ChunkIterator): ChunkIterator {
     yield* upstream
@@ -56,8 +56,9 @@ sinks.add(
     notice: y.boolean().default(true).label('Show notices on console'),
     drop: y.boolean().default(false).label('Drop tables'),
   }),
-  function postgres(opts, rest) {
-    const uri = URI.tryParse(rest.trim())
+  URI,
+  function postgres(opts, uri) {
+    // const uri = URI.tryParse(rest.trim())
     const mode: 'insert' | 'upsert' | 'update' = 'insert'
 
     async function* run(db: pg.Client, upstream: ChunkIterator): ChunkIterator {

@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import {sources, ChunkIterator, Chunk, URI_AND_OBJ, make_read_creator, y} from 'swl'
+import {sources, ChunkIterator, Chunk, URI_AND_OBJ, make_read_creator, y, sinks, URI} from 'swl'
 
 
 export type Selector = boolean | string
@@ -40,9 +40,9 @@ sources.add(
   y.object({
     header: y.string()
   }),
-  async function xlsx(opts, rest) {
+  URI_AND_OBJ,
+  async function xlsx(opts, [file, sources]) {
 
-    const [file, sources] = URI_AND_OBJ.tryParse(rest)
     const files = await make_read_creator(file, {})
 
     return async function *inline_json(upstream: ChunkIterator): ChunkIterator {
@@ -126,5 +126,18 @@ sources.add(
       }
 
     }
-  }, 'xlsx', '.xlsx', '.xlsb', '.ods'
+  }, 'xlsx', '.xlsx', '.xlsb', '.xlsm', '.ods'
+)
+
+sinks.add(
+  y.object({}),
+  URI,
+  function xlsx(opts, uri) {
+
+    return async function *handle(upstream: ChunkIterator): ChunkIterator {
+
+    }
+
+  },
+  'xlsx', '.xlsx', '.xlsm', '.xlsb', '.ods'
 )

@@ -18,6 +18,7 @@ sinks.add(
     collections: y.boolean().default(true),
     values: y.boolean().default(false),
   }),
+  null,
   function sanitize(opts) {
     return async function *sanitize(upstream: ChunkIterator): ChunkIterator {
       for await (var ev of upstream) {
