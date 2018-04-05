@@ -5,6 +5,7 @@ import * as pg from 'pg'
 // export type Selector = boolean | string
 
 sources.add(
+`Read from a PostgreSQL database`,
   y.object(),
   URI_AND_OBJ,
   function postgres(options, [uri, sources]) {
@@ -51,6 +52,7 @@ sources.add(
 
 
 sinks.add(
+`Write to a PostgreSQL Database`,
   y.object({
     truncate: y.boolean().default(false).label('Truncate tables before loading'),
     notice: y.boolean().default(true).label('Show notices on console'),

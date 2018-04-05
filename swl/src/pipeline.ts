@@ -114,6 +114,7 @@ import * as y from 'yup'
 */
 export class FactoryContainer {
   registry = {} as {[name: string]: {
+    help: string,
     factory: Factory<any, any>,
     parser: Parser<any> | null
     schema: y.ObjectSchema<any>
@@ -125,11 +126,11 @@ export class FactoryContainer {
    * @param factory The factory function
    * @param mimes Extensions or mime types that this handler accepts
    */
-  add<T, U>(schema: y.ObjectSchema<T>, parser: Parser<U>, factory: Factory<T, U>, ...mimes: string[]): void
-  add<T>(schema: y.ObjectSchema<T>, parser: null, factory: Factory<T, string>, ...mimes: string[]): void
-  add<T, U>(schema: y.ObjectSchema<T>, parser: null | Parser<U>, factory: Factory<T, U>, ...mimes: string[]) {
+  add<T, U>(help: string, schema: y.ObjectSchema<T>, parser: Parser<U>, factory: Factory<T, U>, ...mimes: string[]): void
+  add<T>(help: string, schema: y.ObjectSchema<T>, parser: null, factory: Factory<T, string>, ...mimes: string[]): void
+  add<T, U>(help: string, schema: y.ObjectSchema<T>, parser: null | Parser<U>, factory: Factory<T, U>, ...mimes: string[]) {
     for (var name of mimes) {
-      this.registry[name] = {factory, schema, parser}
+      this.registry[name] = {help, factory, schema, parser}
     }
   }
 

@@ -4,6 +4,7 @@ import * as y from 'yup'
 
 
 sinks.add(
+`Flatten deep-nested properties to a simple object`,
   y.object(),
   null,
   function flatten(opts) {
@@ -20,6 +21,7 @@ sinks.add(
 )
 
 sinks.add(
+`Unflatten an object to a deep nested structure`,
   y.object(),
   null,
   function unflatten(opts) {

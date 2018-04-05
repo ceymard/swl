@@ -3,6 +3,7 @@ import {URI_AND_OBJ, URI, y, sources, ChunkIterator, Chunk, sinks} from 'swl'
 import * as S from 'better-sqlite3'
 
 sources.add(
+`Read an SQLite database`,
   y.object(),
   URI_AND_OBJ,
   function sqlite(opts, [file, sources]) {
@@ -41,6 +42,7 @@ sources.add(
 
 
 sinks.add(
+`Write to a SQLite database`,
   y.object({
     truncate: y.boolean().default(false).label('Truncate tables before loading'),
     drop: y.boolean().default(false).label('Drop tables'),

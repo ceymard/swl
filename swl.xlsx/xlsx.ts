@@ -37,6 +37,7 @@ for (let i = 0; i < _l.length; i++) {
 
 
 sources.add(
+`Read collections from a notebook`,
   y.object({
     header: y.string()
   }),
@@ -130,6 +131,7 @@ sources.add(
 )
 
 sinks.add(
+`Write collections to a workbook`,
   y.object({}),
   URI,
   function xlsx(opts, uri) {

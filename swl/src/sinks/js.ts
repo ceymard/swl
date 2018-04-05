@@ -3,6 +3,7 @@ import { sinks, ChunkIterator, Chunk } from '../pipeline'
 import * as y from 'yup'
 
 sinks.add(
+`Build a javascript function and run it.`,
   y.object({}),
   null,
   function js(opts, rest) {
@@ -38,7 +39,9 @@ sinks.add(
 
 
 sinks.add(
+`A shortcut for a simple javascript function`,
   y.object({}),
+  null,
   function jsobj(opts, rest) {
 
     var fn: Function = eval(`(_, collection, i) => { return {..._, ${rest}} }`)

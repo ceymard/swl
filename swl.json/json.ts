@@ -4,6 +4,7 @@ import * as y from 'yup'
 
 
 sources.add(
+`Inline json`,
   y.object({}),
   null,
   function inline(opts, rest) {
@@ -26,6 +27,7 @@ sources.add(
 
 
 sources.add(
+`Read json files`,
   y.object({}),
   URI_WITH_OPTS,
   function json (opts, [uri, options]) {
@@ -90,6 +92,7 @@ sources.add(
 
 
 sinks.add(
+`Write a JSON file`,
   y.object({}),
   URI_WITH_OPTS,
   function json(opts, [uri, options]) {

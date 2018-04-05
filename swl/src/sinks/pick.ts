@@ -3,6 +3,7 @@ import { ARRAY_CONTENTS } from '../cmdparse'
 import * as y from 'yup'
 
 sinks.add(
+`Pick properties from records`,
   y.object(),
   ARRAY_CONTENTS,
   function pick(opts, def) {

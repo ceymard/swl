@@ -10,6 +10,7 @@ export interface CsvAdapterOptions {
 }
 
 sources.add(
+`Read csv files`,
   y.object({
     columns: y.boolean().default(true),
     delimiter: y.string().default(';'),
@@ -36,6 +37,7 @@ sources.add(
 
 
 sinks.add(
+`Output to csv`,
   y.object({
     encoding: y.string().default('utf-8'),
     header: y.boolean().default(true),

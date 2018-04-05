@@ -13,6 +13,7 @@ function san(str: string): string {
 }
 
 sinks.add(
+`Sanitize object input by removing non-ascii characters`,
   y.object({
     columns: y.boolean().default(true),
     collections: y.boolean().default(true),
