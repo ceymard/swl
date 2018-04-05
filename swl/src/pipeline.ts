@@ -108,17 +108,22 @@ import * as p from 'path'
 import * as y from 'yup'
 
 
+export interface FactoryObject {
+  help: string,
+  factory: Factory<any, any>
+  parser: Parser<any> | null
+  schema: y.ObjectSchema<any>
+  mimes: string[]
+}
+
+
 /**
  * We use this class to store named factories so that the command
  * parser find them.
 */
 export class FactoryContainer {
-  registry = {} as {[name: string]: {
-    help: string,
-    factory: Factory<any, any>,
-    parser: Parser<any> | null
-    schema: y.ObjectSchema<any>
-  } | undefined}
+  map = {} as {[name: string]: FactoryObject | undefined}
+  all = [] as FactoryObject[]
 
   /**
    * Add a factory to the registry
@@ -129,9 +134,15 @@ export class FactoryContainer {
   add<T, U>(help: string, schema: y.ObjectSchema<T>, parser: Parser<U>, factory: Factory<T, U>, ...mimes: string[]): void
   add<T>(help: string, schema: y.ObjectSchema<T>, parser: null, factory: Factory<T, string>, ...mimes: string[]): void
   add<T, U>(help: string, schema: y.ObjectSchema<T>, parser: null | Parser<U>, factory: Factory<T, U>, ...mimes: string[]) {
+    const factory_object = {help, factory, schema, parser, mimes}
+    this.all.push(factory_object)
     for (var name of mimes) {
-      this.registry[name] = {help, factory, schema, parser}
+      this.map[name] = factory_object
     }
+  }
+
+  [Symbol.iterator]() {
+    return this.all[Symbol.iterator]()
   }
 
   /**
@@ -141,20 +152,20 @@ export class FactoryContainer {
    * @param rest The rest of the command line string
    */
   async get(name: string, options: any, rest: string) {
-    var handler = this.registry[name]
+    var handler = this.map[name]
 
     if (!handler) {
       const re_uri = /^([\w]+):\/\//
       const match = re_uri.exec(name)
       if (match) {
-        handler = this.registry[match[1]]
+        handler = this.map[match[1]]
         rest = `${name.replace(match[0], '')} ${rest}`
       }
     }
 
     if (!handler) {
       const a = p.parse(name)
-      handler = this.registry[a.ext]
+      handler = this.map[a.ext]
       rest = `${name} ${rest}`
     }
 

@@ -38,7 +38,7 @@ sources.add(
 
   }
 
-}, '.db', '.sqlite3', '.sqlite')
+}, 'sqlite', '.db', '.sqlite3', '.sqlite')
 
 
 sinks.add(
