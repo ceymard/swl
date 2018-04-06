@@ -142,6 +142,8 @@ export class FactoryContainer {
   }
 
   [Symbol.iterator]() {
+    this.all.sort((a, b) => a.mimes[0] < b.mimes[0] ? -1 :
+      a.mimes[0] > b.mimes[0] ? 1 : 0)
     return this.all[Symbol.iterator]()
   }
 

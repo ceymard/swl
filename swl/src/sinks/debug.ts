@@ -41,8 +41,10 @@ export function print_value(out: NodeJS.WritableStream, obj: any, outside = true
 }
 
 sinks.add(
-`Print chunks to the console. Note that a debug sink is always
-appended by default -- if it prints nothing it is because another
+`Print chunks to the console.
+
+Note that a debug sink is always appended by default
+-- if it prints nothing it is because another
 sink handled the chunks without passing them along.`,
   y.object({
     data: y.boolean().default(true),

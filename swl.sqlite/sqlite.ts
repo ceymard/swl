@@ -147,7 +147,7 @@ sinks.add(
       db.close()
     }
   },
-  '.db', '.sqlite3', '.sqlite'
+  'sqlite', '.db', '.sqlite3', '.sqlite'
 )
 
 

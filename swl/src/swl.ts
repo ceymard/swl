@@ -3,14 +3,30 @@
 // import {PARSER} from './cmdparse'
 // import {PARSER as OPARSER} from './oparse'
 // import {Adapter, registry} from './adapters'
-import {PARSER, sources, sinks, ADAPTER_AND_OPTIONS, build_pipeline, FactoryObject} from './lib'
+import {PARSER, sources, sinks, ADAPTER_AND_OPTIONS, build_pipeline, FactoryObject, yup} from './lib'
 import { readFileSync } from 'fs'
+import chalk from 'chalk'
 
 const args = process.argv.slice(2)
 // console.log(args)
 
-function displaySimple(obj: FactoryObject) {
-  console.log(`  - ${obj.mimes[0]}`)
+function renderDoc(obj: FactoryObject) {
+  const marked = require('marked')
+  const TerminalRenderer = require('marked-terminal')
+
+  marked.setOptions({
+    renderer: new TerminalRenderer()
+  })
+
+  const schema = obj.schema as yup.ObjectSchema<any>
+  console.log(schema.describe())
+  console.log(marked(obj.help))
+}
+
+function displaySimple(obj: FactoryObject, color: ((s: string) => string)) {
+  const first = obj.help.split('\n').map(l => l.trim()).filter(id => id)[0]
+  console.log(`  - ${color(obj.mimes[0])}${obj.mimes.length > 1 ? ' ' : ''}${chalk.gray(obj.mimes.slice(1).join(', '))} ${first}`)
+  // renderDoc(obj)
 }
 
 async function run() {
@@ -19,18 +35,26 @@ async function run() {
   const fragments = PARSER.tryParse(contents)
   // console.log(fragments)
   const pipe = []
+  if (fragments.length < 1 || fragments[0].inst.trim() === '' || fragments[0].inst.trim().split(' ')[0] === 'help') {
 
-  if (fragments.length < 1 || fragments[0].inst.trim() === '') {
-    console.log(`Available source adapters:`)
+    const second = fragments[0].inst.trim().split(' ')[1]
+
+    if (second) {
+      for (var sink of [...sources, ...sinks])
+        if (sink.mimes.filter(m => m === second).length > 0)
+          renderDoc(sink)
+      return
+    }
+    console.log(second)
+
+    console.log(`\nAvailable source adapters:\n`)
     for (var src of sources) {
-      displaySimple(src)
+      displaySimple(src, chalk.blueBright)
     }
 
-    console.log(`Avalaible sinks:`)
-    for (var x in sinks.map) {
-      if (x.indexOf('.') === 0 || x.indexOf('/') > -1) continue
-      const obj = sinks.map[x]!
-      displaySimple(obj)
+    console.log(`\nAvalaible sinks:\n`)
+    for (var sink of sinks) {
+      displaySimple(sink, chalk.redBright)
     }
     return
   }
