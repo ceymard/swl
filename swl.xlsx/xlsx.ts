@@ -137,7 +137,25 @@ sinks.add(
   function xlsx(opts, uri) {
 
     return async function *handle(upstream: ChunkIterator): ChunkIterator {
-
+      const wb = XLSX.utils.book_new()
+      var name: string | null = null
+      var acc: any[] = []
+      for await (var ch of upstream) {
+        if (ch.type === 'start') {
+          if (name !== null) {
+            XLSX.utils.book_append_sheet(
+              wb,
+              XLSX.utils.json_to_sheet(acc),
+              name
+            )
+          }
+          name = ch.name
+          acc = []
+        } else if (ch.type === 'data') {
+          acc.push(ch.payload)
+        }
+      }
+      XLSX.writeFile(wb, uri)
     }
 
   },
