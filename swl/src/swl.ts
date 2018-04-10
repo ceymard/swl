@@ -45,7 +45,7 @@ async function run() {
           renderDoc(sink)
       return
     }
-    console.log(second)
+    // console.log(second)
 
     console.log(`\nAvailable source adapters:\n`)
     for (var src of sources) {

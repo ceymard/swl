@@ -168,7 +168,7 @@ export class FactoryContainer {
     if (!handler) {
       const a = p.parse(name)
       handler = this.map[a.ext]
-      rest = `${name} ${rest}`
+      rest = rest ? name + ' ' + rest : name
     }
 
     if (!handler) throw new Error(`No handler for ${name}`)
