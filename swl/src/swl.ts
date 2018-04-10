@@ -31,8 +31,8 @@ function displaySimple(obj: FactoryObject, color: ((s: string) => string)) {
 
 async function run() {
   const contents = args[0] !== '-f' ? args
-    .map(a => a.indexOf(' ') > -1 ? `'${a.replace("'", "\\'")}'` : a)
-    .join(' ') : readFileSync(args[1], 'utf-8').replace(/^\s*#[^\n]*$/gm, '')
+  .map(a => a.indexOf(' ') > -1 ? `'${a.replace(/'/g, "\\'")}'` : a)
+  .join(' ') : readFileSync(args[1], 'utf-8').replace(/^\s*#[^\n]*$/gm, '')
   // console.log(contents)
   const fragments = PARSER.tryParse(contents)
   // console.log(fragments)

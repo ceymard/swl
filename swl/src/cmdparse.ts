@@ -36,7 +36,8 @@ const re_regexp = /\/([^']+)\/([imguy]*)/
 
 const QUOTED = Either(
   R(/'''((?!''')[^])*'''/m).map(res => res.slice(3, -3)),
-  R(/'[^']*'|"[^"]*"/m).map(res => res.slice(1, -1))
+  R(/'(\\'|[^'])*'/).map(res => res.slice(1, -1).replace(/\\'/g, "'")),
+  R(/"(\\"|[^"])*"/m).map(res => res.slice(1, -1).replace(/\\"/g, "'"))
 )
 
 const REGEXP = R(re_regexp).map(r => {
