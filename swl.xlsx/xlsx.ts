@@ -140,21 +140,29 @@ sinks.add(
       const wb = XLSX.utils.book_new()
       var name: string | null = null
       var acc: any[] = []
+
+      function write_sheet() {
+        if (name !== null) {
+          XLSX.utils.book_append_sheet(
+            wb,
+            XLSX.utils.json_to_sheet(acc),
+            name
+          )
+        }
+      }
+
       for await (var ch of upstream) {
         if (ch.type === 'start') {
-          if (name !== null) {
-            XLSX.utils.book_append_sheet(
-              wb,
-              XLSX.utils.json_to_sheet(acc),
-              name
-            )
-          }
+          write_sheet()
           name = ch.name
           acc = []
+
         } else if (ch.type === 'data') {
           acc.push(ch.payload)
         }
       }
+
+      write_sheet()
       XLSX.writeFile(wb, uri)
     }
 
