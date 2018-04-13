@@ -4,3 +4,4 @@ lib
 *.js
 *.js.map
 yarn.lock
+*.log
