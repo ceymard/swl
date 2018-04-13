@@ -163,7 +163,8 @@ sinks.add(
       }
 
       write_sheet()
-      XLSX.writeFile(wb, uri)
+      if (name !== null)
+        XLSX.writeFile(wb, uri)
     }
 
   },
