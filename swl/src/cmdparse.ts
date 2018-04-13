@@ -83,9 +83,9 @@ export const OBJECT: P.Parser<{[name: string]: any}> =
   P.sepBy1(Either(PROP, BOOL_PROP), S`,`)
   .map(res => Object.assign({}, ...res))
 
-export const ARRAY_VALUE = P.alt(
+export const ARRAY_VALUE = P.seqMap(__, P.alt(
   PROP, VALUE
-)
+), (_, v) => v)
 
 export const ARRAY_CONTENTS = P.sepBy(ARRAY_VALUE, S`,`)
 export const ARRAY: P.Parser<any[]> = Sequence(S`[`, ARRAY_CONTENTS, S`]`).map(([_, ct, _2]) => ct)
@@ -134,11 +134,11 @@ const OPTS_MARKER = R(/%/)
 export const URI = AnythingBut(SPACE, OPTS_MARKER)
 
 export const URI_AND_OBJ = P.seqMap(
-  P.optWhitespace,
+  __,
   URI,
-  P.optWhitespace,
+  __,
   OBJECT.atMost(1),
-  P.optWhitespace,
+  __,
   (_, uri, _2, obj) => [uri, obj[0]||{}] as [string, any]
 )
 
