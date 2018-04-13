@@ -31,6 +31,7 @@ function displaySimple(obj: FactoryObject, color: ((s: string) => string)) {
 }
 
 async function run() {
+
   const contents = args
   .map(a => a.indexOf(' ') > -1 ? `'${a.replace(/'/g, "\\'")}'` : a)
   .join(' ')
@@ -72,7 +73,6 @@ async function run() {
   do {
     var res = await pipeline.next()
   } while (!res.done)
-  // await pipeline(pipe[0], ...pipe.slice(1))
 }
 
 run().catch(e => console.error(e.stack))

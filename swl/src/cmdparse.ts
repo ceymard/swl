@@ -125,7 +125,7 @@ const INST = Either(SOURCE, SINK)
 const PIPE = P.seqMap(
   INSTRUCTION.map(inst => { return {type: 'source', inst} as Fragment }),
   INST.many(),
-  (i, m) => [i, ...m]
+  (i, m) => i.inst.trim() ? [i, ...m] : m
 )
 
 const SPACE = R(/\s/)
