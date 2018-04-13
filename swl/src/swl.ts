@@ -7,7 +7,7 @@ import {FRAGMENTS, sources, sinks, instantiate_pipeline, FactoryObject, yup, bui
 // import { readFileSync } from 'fs'
 import chalk from 'chalk'
 
-console.log(process.argv)
+// console.log(process.argv)
 const args = process.argv.slice(2)
 // console.log(args)
 

@@ -1,18 +1,19 @@
 
 import { sources, build_pipeline, sinks } from '../pipeline'
-import { URI, FRAGMENTS } from '../cmdparse'
+import { URI, FRAGMENTS, ARRAY_CONTENTS } from '../cmdparse'
+import * as P from 'parsimmon'
 import {readFileSync} from 'fs'
 import * as y from 'yup'
 
 
-async function build_swl_file_pipeline(path: string, opts: any) {
+async function build_swl_file_pipeline(path: string, argv: any[], opts: any) {
   const contents = readFileSync(path, 'utf-8')
     .replace(/^#[^\n]*\n?/mg, '')
     .replace(/\$\{((?:\\\}|[^\}])+)\}/g, (match, val) => {
-      var fn = new Function('_', `return ${val}`)
-      return fn(opts)
+      var fn = new Function('_', 'options', 'env', `return ${val}`)
+      return fn(argv, opts, process.env)
     })
-    // console.log(contents)
+
   return await build_pipeline(FRAGMENTS.tryParse(contents))
 }
 
@@ -20,9 +21,12 @@ async function build_swl_file_pipeline(path: string, opts: any) {
 sources.add(
   `Read swl statements from a file`,
   y.object(),
-  URI,
-  async function swl(opts, file) {
-    return build_swl_file_pipeline(file, opts)
+  P.seq(
+    URI,
+    ARRAY_CONTENTS
+  ),
+  async function swl(opts, [file, argv]) {
+    return build_swl_file_pipeline(file, argv, opts)
   },
   'swl', '.swl'
 )
@@ -30,9 +34,12 @@ sources.add(
 sinks.add(
   `Read swl statements from a file`,
   y.object(),
-  URI,
-  async function swl(opts, file) {
-    return build_swl_file_pipeline(file, opts)
+  P.seq(
+    URI,
+    ARRAY_CONTENTS
+  ),
+  async function swl(opts, [file, argv]) {
+    return build_swl_file_pipeline(file, argv, opts)
   },
   'swl', '.swl'
 )
