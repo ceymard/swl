@@ -1,5 +1,6 @@
 import { Lock } from './streams'
 import { Parser } from 'parsimmon'
+import { Fragment, ADAPTER_AND_OPTIONS } from './cmdparse'
 
 export type ChunkType =
 'start'
@@ -43,25 +44,9 @@ export type ChunkIterator = AsyncIterableIterator<Chunk>
 
 export type Handler = (upstream: ChunkIterator) => ChunkIterator
 
-export type AsyncFactory<T, U> = (options: T, parsed: U) => Promise<Handler>
-export type SyncFactory<T, U> = (options: T, parsed: U) => Handler
+export type AsyncFactory<T, U> = (options: T, parsed: U) => Promise<Handler | Handler[]>
+export type SyncFactory<T, U> = (options: T, parsed: U) => Handler | Handler[]
 export type Factory<T, U> = SyncFactory<T, U> | AsyncFactory<T, U>
-
-
-export function build_pipeline(handlers: Handler[]) {
-
-  async function *start_generator(): ChunkIterator {
-    return
-  }
-  // Connect the handlers between themselves
-  // console.log('toto ?', handlers[0].name)
-  var handler = handlers[0](start_generator())
-  for (var h of handlers.slice(1)) {
-    handler = h(handler)
-  }
-
-  return handler
-}
 
 
 /**
@@ -79,7 +64,7 @@ export function condition(fn: (a: any) => any, handlers: Handler[]) {
   }
 
   handlers.unshift(fake_source)
-  const pipeline = build_pipeline(handlers)
+  const pipeline = instantiate_pipeline(handlers)
 
   return async function *condition(upstream: ChunkIterator): ChunkIterator {
     for await (var chk of upstream) {
@@ -182,3 +167,37 @@ export class FactoryContainer {
 
 export const sources = new FactoryContainer()
 export const sinks = new FactoryContainer()
+
+
+export function instantiate_pipeline(handlers: Handler[]) {
+
+  async function *start_generator(): ChunkIterator {
+    return
+  }
+  // Connect the handlers between themselves
+  // console.log('toto ?', handlers[0].name)
+  var handler = handlers[0](start_generator())
+  for (var h of handlers.slice(1)) {
+    handler = h(handler)
+  }
+
+  return handler
+}
+
+
+export async function build_pipeline(fragments: Fragment[]) {
+  const pipe = [] as Handler[]
+  for (var f of fragments) {
+    var [name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
+    var handler = f.type === 'source' ?
+      await sources.get(name, opts, rest) :
+      await sinks.get(name, opts, rest)
+    if (Array.isArray(handler)) {
+      for (var h of handler) pipe.push(h)
+    } else
+      pipe.push(handler)
+  }
+  return pipe
+}
+
+

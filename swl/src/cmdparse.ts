@@ -101,6 +101,10 @@ export const OBJ = P.seqMap(
 )
 export type PipelineContent = string | string[]
 export type Pipeline = PipelineContent[]
+export type Fragment = {
+  type: 'source' | 'sink',
+  inst: string
+}
 
 const DIVIDER = S`::`
 const SOURCE_DIVIDER = S`++`
@@ -109,17 +113,17 @@ const SOURCE_DIVIDER = S`++`
 
 const INSTRUCTION = AnythingBut(DIVIDER, SOURCE_DIVIDER)
 
-const SOURCE = P.seqMap(SOURCE_DIVIDER, INSTRUCTION, (_, inst) => { return {type: 'source', inst} })
+const SOURCE = P.seqMap(SOURCE_DIVIDER, INSTRUCTION, (_, inst) => { return {type: 'source', inst} as Fragment })
 const SINK = P.seqMap(
   DIVIDER,
   INSTRUCTION,
-  (_, inst) => { return {type: 'sink', inst} }
+  (_, inst) => { return {type: 'sink', inst} as Fragment }
 )
 
 const INST = Either(SOURCE, SINK)
 
 const PIPE = P.seqMap(
-  INSTRUCTION.map(inst => { return {type: 'source', inst} }),
+  INSTRUCTION.map(inst => { return {type: 'source', inst} as Fragment }),
   INST.many(),
   (i, m) => [i, ...m]
 )
@@ -148,7 +152,7 @@ export const URI_WITH_OPTS = P.seqMap(
   (_1, uri, opts) => [uri, opts || {}] as [string, {[name: string]: any}]
 )
 
-export const PARSER = PIPE
+export const FRAGMENTS = PIPE
 
 export const ADAPTER_AND_OPTIONS = P.seqMap(
   P.optWhitespace,

@@ -3,10 +3,11 @@
 // import {PARSER} from './cmdparse'
 // import {PARSER as OPARSER} from './oparse'
 // import {Adapter, registry} from './adapters'
-import {PARSER, sources, sinks, ADAPTER_AND_OPTIONS, build_pipeline, FactoryObject, yup} from './lib'
-import { readFileSync } from 'fs'
+import {FRAGMENTS, sources, sinks, instantiate_pipeline, FactoryObject, yup, build_pipeline} from './lib'
+// import { readFileSync } from 'fs'
 import chalk from 'chalk'
 
+console.log(process.argv)
 const args = process.argv.slice(2)
 // console.log(args)
 
@@ -30,13 +31,13 @@ function displaySimple(obj: FactoryObject, color: ((s: string) => string)) {
 }
 
 async function run() {
-  const contents = args[0] !== '-f' ? args
+  const contents = args
   .map(a => a.indexOf(' ') > -1 ? `'${a.replace(/'/g, "\\'")}'` : a)
-  .join(' ') : readFileSync(args[1], 'utf-8').replace(/^\s*#[^\n]*$/gm, '')
-  // console.log(contents)
-  const fragments = PARSER.tryParse(contents)
+  .join(' ')
+
+  const fragments = FRAGMENTS.tryParse(contents)
+
   // console.log(fragments)
-  const pipe = []
   if (fragments.length < 1 || fragments[0].inst.trim() === '' || fragments[0].inst.trim().split(' ')[0] === 'help') {
 
     const second = fragments[0].inst.trim().split(' ')[1]
@@ -60,28 +61,14 @@ async function run() {
     }
     return
   }
-  // if (fragments.length === 1) {
-  // Maybe should check if there is not a debug already present
+
   fragments.push({
     type: 'sink',
     inst: 'debug'
   })
-  // }
 
-  for (var f of fragments) {
-    var [name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
-    var handler = f.type === 'source' ?
-      await sources.get(name, opts, rest) :
-      await sinks.get(name, opts, rest)
-    pipe.push(handler)
-
-    // console.log(name, handler)
-    // Check that handler exists !
-    // pipe.push(await handler(opts || {}, rest))
-
-  }
-
-  const pipeline = build_pipeline(pipe)
+  const pipe = await build_pipeline(fragments)
+  const pipeline = instantiate_pipeline(pipe)
   do {
     var res = await pipeline.next()
   } while (!res.done)
