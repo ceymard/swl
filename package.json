@@ -3,12 +3,17 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "watch": "concurrently -c red,green,blue,yellow,magenta,cyan,orange -n swl,csv,json,sqlite,xlsx,postgres 'cd swl && npm run watch' 'cd swl.csv && npm run watch' 'cd swl.json && npm run watch' 'cd swl.sqlite && npm run watch' 'cd swl.xlsx && npm run watch' 'cd swl.postgres && npm run watch'"
+    "watch": "concurrently -c red,green,blue,yellow,magenta,cyan,orange -n swl,csv,json,sqlite,xlsx,postgres 'cd swl && npm run watch' 'cd swl.csv && npm run watch' 'cd swl.json && npm run watch' 'cd swl.sqlite && npm run watch' 'cd swl.xlsx && npm run watch' 'cd swl.postgres && npm run watch'",
+    "build": "for dir in swl* ; do (cd $dir && tsc) ; done",
+    "postinstall": "yarn build"
   },
   "workspaces": [
     "./swl*"
   ],
   "dependencies": {
     "concurrently": "^3.5.1"
+  },
+  "devDependencies": {
+    "typescript": "^2.8.1"
   }
 }
