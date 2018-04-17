@@ -38,10 +38,9 @@ async function run() {
 
   const fragments = FRAGMENTS.tryParse(contents)
 
-  // console.log(fragments)
   if (fragments.length < 1 || fragments[0].inst.trim() === '' || fragments[0].inst.trim().split(' ')[0] === 'help') {
 
-    const second = fragments[0].inst.trim().split(' ')[1]
+    const second = fragments.length > 0 && fragments[0].inst.trim().split(' ')[1]
 
     if (second) {
       for (var sink of [...sources, ...sinks])
