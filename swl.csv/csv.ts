@@ -3,12 +3,6 @@ import { URI_WITH_OPTS, make_write_creator, make_read_creator, sources, y, Chunk
 import * as stringify from 'csv-stringify'
 import * as parse from 'csv-parse'
 
-export interface CsvAdapterOptions {
-  encoding?: string
-  header?: boolean
-  delimiter?: string
-}
-
 sources.add(
 `Read csv files`,
   y.object({
@@ -47,7 +41,8 @@ sinks.add(
   async function csv(opts, [uri, options]) {
 
     return async function *csv(upstream: ChunkIterator): ChunkIterator {
-      var w = await make_write_creator(uri, options)
+      var w = await make_write_creator(uri, Object.assign({}, options, opts))
+      console.log(Object.assign({}, options, opts))
       var file: StreamWrapper<NodeJS.WritableStream>
 
       for await (var chk of upstream) {

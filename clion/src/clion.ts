@@ -67,7 +67,7 @@ export const BOOL_PROP = Sequence(
 export const PROP = Sequence(
   R(/[\w\.]+/),
   S`:`,
-  VALUE
+  Either(S`,`, VALUE)
 ).map(([name, _, val]) => { return {[name]: val} })
 
 // const value = P.any(date, prop)
