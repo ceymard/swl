@@ -1,5 +1,5 @@
 import { ChunkIterator, sinks, Chunk } from '../pipeline'
-import { ARRAY_CONTENTS } from '../cmdparse'
+import { ARRAY_CONTENTS } from 'clion'
 import * as y from 'yup'
 
 sinks.add(

@@ -1,6 +1,7 @@
 
 import { sources, build_pipeline, sinks } from '../pipeline'
-import { URI, FRAGMENTS, ARRAY_CONTENTS } from '../cmdparse'
+import { ARRAY_CONTENTS } from 'clion'
+import { URI, FRAGMENTS } from '../cmdparse'
 import * as P from 'parsimmon'
 import {readFileSync} from 'fs'
 import * as y from 'yup'
