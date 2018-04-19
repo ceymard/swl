@@ -50,7 +50,7 @@ const PIPE = P.seqMap(
 const SPACE = R(/\s/)
 const OPTS_MARKER = R(/[%\?]/)
 
-export const URI = Either(AnythingBut(SPACE, OPTS_MARKER), QUOTED)
+export const URI = Either(QUOTED, AnythingBut(SPACE, OPTS_MARKER))
 
 export const URI_AND_OBJ = P.seqMap(
   __,
