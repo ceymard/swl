@@ -48,7 +48,7 @@ const PIPE = P.seqMap(
 )
 
 const SPACE = R(/\s/)
-const OPTS_MARKER = R(/%/)
+const OPTS_MARKER = R(/[%\?]/)
 
 export const URI = Either(AnythingBut(SPACE, OPTS_MARKER), QUOTED)
 
