@@ -1,8 +1,8 @@
 
-import { sinks, ChunkIterator, Chunk } from '../pipeline'
+import { transformers, ChunkIterator, Chunk } from '../pipeline'
 import * as y from 'yup'
 
-sinks.add(
+transformers.add(
 `Build a javascript function and run it.`,
   y.object({}),
   null,
@@ -38,7 +38,7 @@ sinks.add(
 )
 
 
-sinks.add(
+transformers.add(
 `A shortcut for a simple javascript function`,
   y.object({}),
   null,

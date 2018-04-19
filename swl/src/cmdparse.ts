@@ -83,7 +83,3 @@ export const ADAPTER_AND_OPTIONS = P.seqMap(
   P.all,
   (_1, uri, opts, rest) => [uri, opts || {}, rest] as [string, {[name: string]: any}, string]
 )
-
-export function parse(...parsers: P.Parser<any>[]) {
-
-}

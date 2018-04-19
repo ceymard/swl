@@ -3,7 +3,7 @@
 // import {PARSER} from './cmdparse'
 // import {PARSER as OPARSER} from './oparse'
 // import {Adapter, registry} from './adapters'
-import {FRAGMENTS, sources, sinks, instantiate_pipeline, FactoryObject, yup, build_pipeline} from './lib'
+import {FRAGMENTS, sources, sinks, instantiate_pipeline, FactoryObject, yup, build_pipeline, transformers} from './lib'
 // import { readFileSync } from 'fs'
 import chalk from 'chalk'
 
@@ -43,17 +43,20 @@ async function run() {
     const second = fragments.length > 0 && fragments[0].inst.trim().split(' ')[1]
 
     if (second) {
-      for (var sink of [...sources, ...sinks])
+      for (var sink of [...sources, ...transformers, ...sinks])
         if (sink.mimes.filter(m => m === second).length > 0)
           renderDoc(sink)
       return
     }
-    // console.log(second)
 
     console.log(`\nAvailable source adapters:\n`)
     for (var src of sources) {
       displaySimple(src, chalk.blueBright)
     }
+
+    console.log(`\nAvailable transformers:\n`)
+    for (var tr of transformers)
+      displaySimple(tr, chalk.yellowBright)
 
     console.log(`\nAvalaible sinks:\n`)
     for (var sink of sinks) {

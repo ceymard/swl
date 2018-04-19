@@ -138,7 +138,7 @@ export class FactoryContainer {
    * @param options Provided options to the factory
    * @param rest The rest of the command line string
    */
-  async get(name: string, options: any, rest: string) {
+  async get(name: string, options: any, rest: string): Promise<Handler | Handler[] | null> {
     var handler = this.map[name]
 
     if (!handler) {
@@ -156,7 +156,7 @@ export class FactoryContainer {
       rest = rest ? name + ' ' + rest : name
     }
 
-    if (!handler) throw new Error(`No handler for ${name}`)
+    if (!handler) return null
 
     var opts = handler.schema.cast(options)
     var parsed = handler.parser ? handler.parser.tryParse(rest) : rest
@@ -167,6 +167,7 @@ export class FactoryContainer {
 
 export const sources = new FactoryContainer()
 export const sinks = new FactoryContainer()
+export const transformers = new FactoryContainer()
 
 
 export function instantiate_pipeline(handlers: Handler[]) {
@@ -189,13 +190,18 @@ export async function build_pipeline(fragments: Fragment[]) {
   const pipe = [] as Handler[]
   for (var f of fragments) {
     var [name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
+
     var handler = f.type === 'source' ?
-      await sources.get(name, opts, rest) :
-      await sinks.get(name, opts, rest)
+      await sources.get(name, opts, rest) : await transformers.get(name, opts, rest) || await sinks.get(name, opts, rest)
+
+
     if (Array.isArray(handler)) {
       for (var h of handler) pipe.push(h)
-    } else
+    } else if (handler) {
       pipe.push(handler)
+    } else {
+      throw new Error(`No handler for '${name}'`)
+    }
   }
   return pipe
 }

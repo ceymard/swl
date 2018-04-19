@@ -1,4 +1,4 @@
-import { ChunkIterator, sinks, Chunk } from '../pipeline'
+import { ChunkIterator, transformers, Chunk } from '../pipeline'
 import * as y from 'yup'
 
 
@@ -12,7 +12,7 @@ function san(str: string): string {
     .toLowerCase()
 }
 
-sinks.add(
+transformers.add(
 `Sanitize object input by removing non-ascii characters`,
   y.object({
     columns: y.boolean().default(true),

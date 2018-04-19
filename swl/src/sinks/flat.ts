@@ -1,9 +1,9 @@
-import { ChunkIterator, sinks, Chunk } from '../pipeline'
+import { ChunkIterator, transformers, Chunk } from '../pipeline'
 import { flatten as f, unflatten as u } from 'flat'
 import * as y from 'yup'
 
 
-sinks.add(
+transformers.add(
 `Flatten deep-nested properties to a simple object`,
   y.object(),
   null,
@@ -20,7 +20,7 @@ sinks.add(
   }, 'flatten'
 )
 
-sinks.add(
+transformers.add(
 `Unflatten an object to a deep nested structure`,
   y.object(),
   null,

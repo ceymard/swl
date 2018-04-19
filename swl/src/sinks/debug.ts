@@ -1,5 +1,5 @@
 
-import { sinks, ChunkIterator } from '../pipeline'
+import { transformers, ChunkIterator } from '../pipeline'
 import { inspect } from 'util'
 import * as y from 'yup'
 
@@ -40,7 +40,7 @@ export function print_value(out: NodeJS.WritableStream, obj: any, outside = true
   }
 }
 
-sinks.add(
+transformers.add(
 `Print chunks to the console.
 
 Note that a debug sink is always appended by default
