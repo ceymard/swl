@@ -53,11 +53,7 @@ const OPTS_MARKER = R(/[%\?]/)
 export const URI = Either(QUOTED, AnythingBut(SPACE, OPTS_MARKER))
 
 export const URI_AND_OBJ = P.seqMap(
-  __,
-  URI,
-  __,
-  OBJECT.atMost(1),
-  __,
+  __, URI, __, OBJECT.atMost(1), __,
   (_, uri, _2, obj) => [uri, obj[0]||{}] as [string, any]
 )
 

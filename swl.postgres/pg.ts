@@ -2,13 +2,45 @@
 import {URI_AND_OBJ, sources, Chunk, ChunkIterator, y, sinks, URI} from 'swl'
 import * as pg from 'pg'
 
-// export type Selector = boolean | string
+import * as gp from 'get-port'
+const tunnel = require('tunnel-ssh')
+import { promisify } from 'util'
+
+async function open_tunnel(uri: string) {
+  var local_port = await gp()
+  var re_tunnel = /([^@:\/]+):(\d+)@@(?:([^@:]+)(?::([^@]+))?@)?([^:/]+)(?::([^\/]+))?/
+
+  var match = re_tunnel.exec(uri)
+  if (match) {
+    const [remote_host, remote_port, user, password, host, port] = match.slice(1)
+    var t = promisify(tunnel)
+
+    var config: any = {
+      host, port: port || 22,
+      dstHost: remote_host, dstPort: remote_port,
+      localPort: local_port, localHost: '127.0.0.1'
+    }
+
+    if (user) config.username = user
+    if (password) config.password = password
+
+    await t(config)
+
+  } else {
+    return uri
+  }
+  // console.log(port)
+
+  return uri.replace(match[0], `127.0.0.1:${local_port}`)
+}
 
 sources.add(
 `Read from a PostgreSQL database`,
   y.object(),
   URI_AND_OBJ,
-  function postgres(options, [uri, sources]) {
+  async function postgres(options, [uri, sources]) {
+
+  uri = await open_tunnel(uri)
 
   return async function *(upstream: ChunkIterator): ChunkIterator {
     yield* upstream
