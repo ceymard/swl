@@ -6,31 +6,35 @@ import * as gp from 'get-port'
 const tunnel = require('tunnel-ssh')
 import { promisify } from 'util'
 
+/**
+ * Try to find a forward pattern in an URI and create the ssh tunnel if
+ * found.
+ *
+ * @param uri: the uri to search the pattern in
+ * @returns a modified URI with the forwarded port on localhost
+ */
 async function open_tunnel(uri: string) {
   var local_port = await gp()
   var re_tunnel = /([^@:\/]+):(\d+)@@(?:([^@:]+)(?::([^@]+))?@)?([^:/]+)(?::([^\/]+))?/
 
   var match = re_tunnel.exec(uri)
-  if (match) {
-    const [remote_host, remote_port, user, password, host, port] = match.slice(1)
-    var t = promisify(tunnel)
 
-    var config: any = {
-      host, port: port || 22,
-      dstHost: remote_host, dstPort: remote_port,
-      localPort: local_port, localHost: '127.0.0.1'
-    }
+  // If there is no forward to create, just return the uri as-is
+  if (!match) return uri
 
-    if (user) config.username = user
-    if (password) config.password = password
+  const [remote_host, remote_port, user, password, host, port] = match.slice(1)
+  var t = promisify(tunnel)
 
-    await t(config)
-
-  } else {
-    return uri
+  var config: any = {
+    host, port: port || 22,
+    dstHost: remote_host, dstPort: remote_port,
+    localPort: local_port, localHost: '127.0.0.1'
   }
-  // console.log(port)
 
+  if (user) config.username = user
+  if (password) config.password = password
+
+  await t(config)
   return uri.replace(match[0], `127.0.0.1:${local_port}`)
 }
 

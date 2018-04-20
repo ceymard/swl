@@ -11,10 +11,8 @@
     "./swl*",
     "./clion"
   ],
-  "dependencies": {
-    "concurrently": "^3.5.1"
-  },
   "devDependencies": {
-    "typescript": "^2.8.1"
+    "concurrently": "^3.5.1",
+    "typescript": "^2.8.3"
   }
 }
