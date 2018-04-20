@@ -4,6 +4,8 @@ import * as pg from 'pg'
 
 import * as gp from 'get-port'
 const tunnel = require('tunnel-ssh')
+const conf = require('ssh-config')
+import * as fs from 'fs'
 import { promisify } from 'util'
 
 /**
@@ -26,13 +28,27 @@ async function open_tunnel(uri: string) {
   var t = promisify(tunnel)
 
   var config: any = {
-    host, port: port || 22,
+    host, port: port,
     dstHost: remote_host, dstPort: remote_port,
     localPort: local_port, localHost: '127.0.0.1'
   }
 
   if (user) config.username = user
   if (password) config.password = password
+
+  try {
+    var _conf = conf.parse(fs.readFileSync(`${process.env.HOME}/.ssh/config`, 'utf-8'))
+    const comp = _conf.compute(host)
+    if (comp.HostName) config.host = comp.HostName
+    if (comp.User && !config.username) config.username = comp.User
+    if (comp.Password && !config.password) config.password = comp.Password
+    if (comp.Port && !config.port) config.port = comp.Port
+
+  } catch (e) {
+    console.log(e)
+  }
+
+  if (!config.port) config.port = 22
 
   await t(config)
   return uri.replace(match[0], `127.0.0.1:${local_port}`)
