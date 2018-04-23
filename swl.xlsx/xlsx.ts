@@ -4,12 +4,11 @@ import {
   ChunkIterator,
   Chunk,
   Sequence,
-  Optional,
   make_read_creator,
   y,
   sinks,
   URI,
-  OBJECT
+  OPT_OBJECT
 } from 'swl'
 
 
@@ -52,7 +51,7 @@ sources.add(
   y.object({
     header: y.string()
   }),
-  Sequence(URI, Optional(OBJECT)),
+  Sequence(URI, OPT_OBJECT),
   async function xlsx(opts, [file, sources]) {
 
     const files = await make_read_creator(file, {})

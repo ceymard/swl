@@ -1,11 +1,11 @@
 
-import {URI_AND_OBJ, URI, y, sources, ChunkIterator, Chunk, sinks} from 'swl'
+import {Sequence, OPT_OBJECT, URI, y, sources, ChunkIterator, Chunk, sinks} from 'swl'
 import * as S from 'better-sqlite3'
 
 sources.add(
 `Read an SQLite database`,
   y.object(),
-  URI_AND_OBJ,
+  Sequence(URI, OPT_OBJECT),
   function sqlite(opts, [file, sources]) {
 
   return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {

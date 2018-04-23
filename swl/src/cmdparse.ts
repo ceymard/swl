@@ -57,10 +57,6 @@ const OPTS_MARKER = R(/[%\?]/)
 
 export const URI = Either(QUOTED, AnythingBut(SPACE, OPTS_MARKER)).map(u => open_tunnel(u))
 
-export const URI_AND_OBJ = P.seqMap(
-  __, URI, __, OBJECT.atMost(1), __,
-  (_, uri, _2, obj) => [uri, obj[0]||{}] as [Promise<string>, any]
-)
 
 export const URI_WITH_OPTS = P.seqMap(
   __,
@@ -84,5 +80,8 @@ export const ADAPTER_AND_OPTIONS = P.seqMap(
   P.all,
   (_1, uri, opts, rest) => [uri, opts || {}, rest] as [Promise<string>, {[name: string]: any}, string]
 )
+
+
+export const OPT_OBJECT = Optional(OBJECT).map(o => o || {})
 
 export {OBJECT, QUOTED}

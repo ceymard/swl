@@ -1,13 +1,14 @@
 
-import {URI_AND_OBJ, sources, Chunk, ChunkIterator, y, sinks, URI} from 'swl'
+import {Sequence, sources, Chunk, ChunkIterator, y, sinks, URI, OPT_OBJECT} from 'swl'
 import * as pg from 'pg'
 
 
 sources.add(
 `Read from a PostgreSQL database`,
   y.object(),
-  URI_AND_OBJ,
-  async function postgres(options, [uri, sources]) {
+  Sequence(URI, OPT_OBJECT),
+  async function postgres(options, [uri, src]) {
+    var sources = src || {}
 
   return async function *(upstream: ChunkIterator): ChunkIterator {
     yield* upstream
