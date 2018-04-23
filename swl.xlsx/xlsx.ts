@@ -1,5 +1,16 @@
 import * as XLSX from 'xlsx'
-import {sources, ChunkIterator, Chunk, URI_AND_OBJ, make_read_creator, y, sinks, URI} from 'swl'
+import {
+  sources,
+  ChunkIterator,
+  Chunk,
+  Sequence,
+  Optional,
+  make_read_creator,
+  y,
+  sinks,
+  URI,
+  OBJECT
+} from 'swl'
 
 
 export type Selector = boolean | string
@@ -41,7 +52,7 @@ sources.add(
   y.object({
     header: y.string()
   }),
-  URI_AND_OBJ,
+  Sequence(URI, Optional(OBJECT)),
   async function xlsx(opts, [file, sources]) {
 
     const files = await make_read_creator(file, {})
@@ -60,7 +71,7 @@ sources.add(
           const s = w.Sheets[sname]
 
           // Find out if this sheet should be part of the extraction
-          if (Object.keys(sources).length > 0 && !sources[sname])
+          if (sources && Object.keys(sources).length > 0 && !sources[sname])
             // If there was a specification of keys and this sheet name is not
             // one of it, then just continue to the next collection
             continue
@@ -75,7 +86,7 @@ sources.add(
           var header_column = 0
 
           const re_header = /^([A-Z]+)(\d+)$/
-          const hd = opts.header || sources[sname]
+          const hd = opts.header || sources && sources![sname]
           if (typeof hd === 'string') {
             var m = re_header.exec(hd)
             if (m) {

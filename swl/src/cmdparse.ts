@@ -1,6 +1,7 @@
 
 import * as P from 'parsimmon'
-import {OBJECT, QUOTED} from 'clion'
+import { OBJECT, QUOTED } from 'clion'
+import { open_tunnel } from './streams'
 
 function S(t: TemplateStringsArray) {
   return P.seqMap(P.optWhitespace, P.string(t.join('')), P.optWhitespace, (_1, res, _2) => res)
@@ -15,7 +16,11 @@ function AnythingBut(...parsers: P.Parser<any>[]): P.Parser<string> {
     .many().map(s => s.join(''))
 }
 
-const Either = P.alt
+export const Either = P.alt
+export const Sequence = P.seq
+export function Optional<T>(p: P.Parser<T>): P.Parser<T | null> {
+  return p.atMost(1).map(r => (r[0] || null))
+}
 
 
 export type PipelineContent = string | string[]
@@ -50,11 +55,11 @@ const PIPE = P.seqMap(
 const SPACE = R(/\s/)
 const OPTS_MARKER = R(/[%\?]/)
 
-export const URI = Either(QUOTED, AnythingBut(SPACE, OPTS_MARKER))
+export const URI = Either(QUOTED, AnythingBut(SPACE, OPTS_MARKER)).map(u => open_tunnel(u))
 
 export const URI_AND_OBJ = P.seqMap(
   __, URI, __, OBJECT.atMost(1), __,
-  (_, uri, _2, obj) => [uri, obj[0]||{}] as [string, any]
+  (_, uri, _2, obj) => [uri, obj[0]||{}] as [Promise<string>, any]
 )
 
 export const URI_WITH_OPTS = P.seqMap(
@@ -64,7 +69,7 @@ export const URI_WITH_OPTS = P.seqMap(
     P.seqMap(OPTS_MARKER, OBJECT, P.optWhitespace ,(_q, ob) => ob),
     __.map(_ => null)
   ),
-  (_1, uri, opts) => [uri, opts || {}] as [string, {[name: string]: any}]
+  (_1, uri, opts) => [uri, opts || {}] as [Promise<string>, {[name: string]: any}]
 )
 
 export const FRAGMENTS = PIPE
@@ -77,5 +82,7 @@ export const ADAPTER_AND_OPTIONS = P.seqMap(
     P.optWhitespace.map(_ => null)
   ),
   P.all,
-  (_1, uri, opts, rest) => [uri, opts || {}, rest] as [string, {[name: string]: any}, string]
+  (_1, uri, opts, rest) => [uri, opts || {}, rest] as [Promise<string>, {[name: string]: any}, string]
 )
+
+export {OBJECT, QUOTED}

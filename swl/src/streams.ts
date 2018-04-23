@@ -126,3 +126,56 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
   }
 
 }
+
+
+import * as gp from 'get-port'
+const tunnel = require('tunnel-ssh')
+const conf = require('ssh-config')
+import * as fs from 'fs'
+import { promisify } from 'util'
+
+/**
+ * Try to find a forward pattern in an URI and create the ssh tunnel if
+ * found.
+ *
+ * @param uri: the uri to search the pattern in
+ * @returns a modified URI with the forwarded port on localhost
+ */
+export async function open_tunnel(uri: string) {
+  var local_port = await gp()
+  var re_tunnel = /([^@:\/]+):(\d+)@@(?:([^@:]+)(?::([^@]+))?@)?([^:/]+)(?::([^\/]+))?/
+
+  var match = re_tunnel.exec(uri)
+
+  // If there is no forward to create, just return the uri as-is
+  if (!match) return uri
+
+  const [remote_host, remote_port, user, password, host, port] = match.slice(1)
+
+  var config: any = {
+    host, port: port,
+    dstHost: remote_host, dstPort: remote_port,
+    localPort: local_port, localHost: '127.0.0.1'
+  }
+
+  if (user) config.username = user
+  if (password) config.password = password
+
+  try {
+    var _conf = conf.parse(fs.readFileSync(`${process.env.HOME}/.ssh/config`, 'utf-8'))
+    const comp = _conf.compute(host)
+    if (comp.HostName) config.host = comp.HostName
+    if (comp.User && !config.username) config.username = comp.User
+    if (comp.Password && !config.password) config.password = comp.Password
+    if (comp.Port && !config.port) config.port = comp.Port
+
+  } catch (e) {
+    // console.log(e)
+  }
+
+  if (!config.port) config.port = 22
+
+  // Create the tunnel
+  await promisify(tunnel)(config)
+  return uri.replace(match[0], `127.0.0.1:${local_port}`)
+}

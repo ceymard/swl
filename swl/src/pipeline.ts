@@ -102,6 +102,16 @@ export interface FactoryObject {
 }
 
 
+export type Unpromise<T> =
+  T extends Promise<infer A> ? A
+  : T
+
+export type Un<T> =
+  T extends [infer A, infer B, infer C] ? [Unpromise<A>, Unpromise<B>, Unpromise<C>]
+  : T extends [infer A, infer B] ? [Unpromise<A>, Unpromise<B>]
+  : Unpromise<T>
+
+
 /**
  * We use this class to store named factories so that the command
  * parser find them.
@@ -116,7 +126,7 @@ export class FactoryContainer {
    * @param factory The factory function
    * @param mimes Extensions or mime types that this handler accepts
    */
-  add<T, U>(help: string, schema: y.ObjectSchema<T>, parser: Parser<U>, factory: Factory<T, U>, ...mimes: string[]): void
+  add<T, U>(help: string, schema: y.ObjectSchema<T>, parser: Parser<U>, factory: Factory<T, Un<U>>, ...mimes: string[]): void
   add<T>(help: string, schema: y.ObjectSchema<T>, parser: null, factory: Factory<T, string>, ...mimes: string[]): void
   add<T, U>(help: string, schema: y.ObjectSchema<T>, parser: null | Parser<U>, factory: Factory<T, U>, ...mimes: string[]) {
     const factory_object = {help, factory, schema, parser, mimes}
@@ -159,7 +169,12 @@ export class FactoryContainer {
     if (!handler) return null
 
     var opts = handler.schema.cast(options)
-    var parsed = handler.parser ? handler.parser.tryParse(rest) : rest
+    var parsed = await (handler.parser ? handler.parser.tryParse(rest) : rest)
+
+    if (Array.isArray(parsed)) {
+      parsed = await (Promise.all(parsed))
+    }
+
     return await handler.factory(opts, parsed)
   }
 }
@@ -189,11 +204,11 @@ export function instantiate_pipeline(handlers: Handler[]) {
 export async function build_pipeline(fragments: Fragment[]) {
   const pipe = [] as Handler[]
   for (var f of fragments) {
-    var [name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
+    var [_name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
+    const name = await _name
 
     var handler = f.type === 'source' ?
       await sources.get(name, opts, rest) : await transformers.get(name, opts, rest) || await sinks.get(name, opts, rest)
-
 
     if (Array.isArray(handler)) {
       for (var h of handler) pipe.push(h)
