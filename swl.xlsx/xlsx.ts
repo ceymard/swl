@@ -60,7 +60,6 @@ sources.add(
       yield* upstream
 
       for await (const file of files) {
-        // console.log(src)
         const b = await get_stream(file.source)
         const w = XLSX.read(b, {cellHTML: false, cellText: false})
         // console.log(wp)
@@ -93,7 +92,6 @@ sources.add(
               header_line = parseInt(m[2])
             }
           }
-
           // We have to figure out the number of lines
           const lines = parseInt(match[4])
 
@@ -103,7 +101,7 @@ sources.add(
           for (var i = header_column; i < columns.length; i++) {
             const cell = s[`${columns[i]}${header_line}`]
             if (!cell || !cell.v)
-              break
+            break
             header.push(cell.v)
           }
 

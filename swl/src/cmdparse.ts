@@ -17,9 +17,31 @@ function AnythingBut(...parsers: P.Parser<any>[]): P.Parser<string> {
 }
 
 export const Either = P.alt
-export const Sequence = P.seq
+
+function _Sequence(...a: P.Parser<any>[]) {
+  const parsers = [] as P.Parser<any>[]
+  var cbk: Function | null = null
+  for (var p of a) {
+    if (typeof p === 'function') {
+      cbk = p
+      break
+    } else {
+      parsers.push(__)
+      parsers.push(p)
+    }
+  }
+
+  return P.seq(...parsers).map(res => {
+    res = res.filter((item, idx) => idx % 2 !== 0)
+    return cbk ? cbk(...res) : res
+  })
+}
+
+export const Sequence = _Sequence as typeof P.seq & typeof P.seqMap
+
 export function Optional<T>(p: P.Parser<T>): P.Parser<T | null> {
-  return p.atMost(1).map(r => (r[0] || null))
+  return Sequence(__, p, (_, r) => r)
+    .atMost(1).map(r => (r[0] || null))
 }
 
 
@@ -37,14 +59,22 @@ const SOURCE_DIVIDER = S`++`
 
 const INSTRUCTION = AnythingBut(DIVIDER, SOURCE_DIVIDER)
 
-const SOURCE = P.seqMap(SOURCE_DIVIDER, INSTRUCTION, (_, inst) => { return {type: 'source', inst} as Fragment })
-const SINK = P.seqMap(
+
+const SOURCE = Sequence(
+  SOURCE_DIVIDER,
+  INSTRUCTION,
+  (_, inst) => { return {type: 'source', inst} as Fragment }
+)
+
+
+const SINK = Sequence(
   DIVIDER,
   INSTRUCTION,
   (_, inst) => { return {type: 'sink', inst} as Fragment }
 )
 
 const INST = Either(SOURCE, SINK)
+
 
 const PIPE = P.seqMap(
   INSTRUCTION.map(inst => { return {type: 'source', inst} as Fragment }),
@@ -67,6 +97,23 @@ export const URI_WITH_OPTS = P.seqMap(
   ),
   (_1, uri, opts) => [uri, opts || {}] as [Promise<string>, {[name: string]: any}]
 )
+
+
+export const STREAM = Sequence(
+  URI,
+  Optional(Sequence(OPTS_MARKER, OBJECT, (_, ob) => ob)),
+)
+
+/**
+ * A stream wrapper generator function
+ */
+export const WRITE_STREAMS = STREAM
+
+/**
+ * Stream wrappers for several reads (when taking globbing into account)
+ */
+export const READ_STREAMS = STREAM
+
 
 export const FRAGMENTS = PIPE
 

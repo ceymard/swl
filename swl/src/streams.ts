@@ -4,10 +4,11 @@ import {createWriteStream, createReadStream} from 'fs'
 export async function make_write_creator(uri: string, options: any) {
   // Check for protocol !!
   var glob = uri.indexOf('*') > -1
-  var stream: NodeJS.WritableStream
-  return function (name: string) {
+  var stream: StreamWrapper<NodeJS.WritableStream>
+  return async function (name: string) {
     if (!glob && stream) return stream
-    return createWriteStream(uri.replace('*', name), options)
+    stream = new StreamWrapper(createWriteStream(uri.replace('*', name), options))
+    return stream
   }
 }
 
@@ -112,6 +113,7 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
    * Write data to the streama
    */
   async write<U extends NodeJS.WritableStream>(this: StreamWrapper<U>, data: any) {
+
     if (this.should_drain) {
       await this.drained.promise
       this.should_drain = false

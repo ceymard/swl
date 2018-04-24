@@ -99,17 +99,16 @@ sinks.add(
 
     return async function *json(upstream): ChunkIterator {
 
-      var wr!: StreamWrapper<NodeJS.WritableStream>
       var creator = await make_write_creator(uri, options)
+      var wr!: StreamWrapper<NodeJS.WritableStream>
 
       for await (var chk of upstream) {
 
         if (chk.type === 'start') {
           const collection = chk.name
-          const w = creator(collection)
-          wr = new StreamWrapper(w)
+          wr = await creator(collection)
         } else if (chk.type === 'data') {
-          await wr.write(JSON.stringify(chk.payload))
+          await wr.write(JSON.stringify(chk.payload) + '\n')
         } else yield chk
       }
 
