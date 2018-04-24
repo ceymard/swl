@@ -42,14 +42,13 @@ sinks.add(
 
     return async function *csv(upstream: ChunkIterator): ChunkIterator {
       var w = await make_write_creator(uri, Object.assign({}, options, opts))
-      console.log(Object.assign({}, options, opts))
       var file: StreamWrapper<NodeJS.WritableStream>
 
       for await (var chk of upstream) {
         if (chk.type === 'start') {
           var end = await w(chk.name)
           var st = stringify(opts)
-          st.pipe(end)
+          st.pipe(end.stream)
           file = new StreamWrapper(st)
         } else if (chk.type === 'data') {
           await file!.write(chk.payload)
