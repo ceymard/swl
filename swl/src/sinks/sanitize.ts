@@ -2,14 +2,19 @@ import { ChunkIterator, transformers, Chunk } from '../pipeline'
 import * as y from 'yup'
 
 
+var _cache = {} as {[str: string]: string}
 function san(str: string): string {
+  const cached = _cache[str]
+  if (typeof cached !== 'undefined') return cached
   // Remove accents
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "")
-    // only keep ascii characters, numbers, and a few useful characters like punctutation
-    .replace(/[^\w-_\/\\.!?,:; \s\n\{\}]/, '')
-    .replace(/[\n\s+]/gm, '_')
+  const res = str.normalize('NFD').replace(/[\u0300-\u036f]/g, "")
+  .replace(/[-\.:;\n\s+]/gm, '_')
+  // only keep ascii characters, numbers, and a few useful characters like punctutation
+    .replace(/[^\w-0-9_\/\\!?,:; \s\n\{\}]/gm, '')
     .trim()
     .toLowerCase()
+  _cache[str] = res
+  return res
 }
 
 transformers.add(
