@@ -1,5 +1,5 @@
 
-import { transformers, ChunkIterator } from '../pipeline'
+import { transformers, ChunkIterator, sinks } from '../pipeline'
 import { inspect } from 'util'
 import * as y from 'yup'
 
@@ -18,7 +18,7 @@ export function print_value(out: NodeJS.WritableStream, obj: any, outside = true
   if (obj == null) {
     out.write(constant(obj))
   } else if (typeof obj === 'string') {
-    out.write(str(obj.replace('\n', '\\n')))
+    out.write(str(obj.replace('\n', '\\n') || "''"))
   } else if (typeof obj === 'number') {
     out.write(num(obj as any))
   } else if (typeof obj === 'boolean') {
@@ -75,3 +75,17 @@ sink handled the chunks without passing them along.`,
     }
   }
 }, 'debug')
+
+sinks.add(
+  `Drop chunks`,
+  y.object(),
+  null,
+  function nulll() {
+    return async function *(upstream: ChunkIterator): ChunkIterator {
+      for await (var ch of upstream) {
+        // do nothing, yield nothing
+        ch
+      }
+    }
+  }, 'null'
+)
