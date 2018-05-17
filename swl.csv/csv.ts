@@ -1,13 +1,13 @@
 import { URI_WITH_OPTS, make_write_creator, make_read_creator, sources, y, ChunkIterator, Chunk, StreamWrapper, sinks} from 'swl'
 
 import * as stringify from 'csv-stringify'
-import * as parse from 'csv-parse'
+const parse = require('csv-parser')
 
 sources.add(
 `Read csv files`,
   y.object({
     columns: y.boolean().default(true),
-    delimiter: y.string().default(';'),
+    separator: y.string().default(';'),
     auto_parse: y.boolean().default(true)
   }),
   URI_WITH_OPTS,
