@@ -169,7 +169,20 @@ export class FactoryContainer {
     if (!handler) return null
 
     var opts = handler.schema.cast(options)
-    var parsed = await (handler.parser ? handler.parser.tryParse(rest) : rest)
+    const parser = handler.parser
+    var parsed: any = rest
+    if (parser) {
+      const result = parser.parse(rest)
+      if (result.status) {
+        parsed = await result.value
+      } else {
+
+        // const offset = result.index.offset
+        // const r = rest.slice(offset)
+        // console.log(rest)
+        throw new Error(`Expected ${result.expected}`)
+      }
+    }
 
     if (Array.isArray(parsed)) {
       parsed = await (Promise.all(parsed))
@@ -204,6 +217,7 @@ export function instantiate_pipeline(handlers: Handler[]) {
 export async function build_pipeline(fragments: Fragment[]) {
   const pipe = [] as Handler[]
   for (var f of fragments) {
+
     var [_name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
     const name = await _name
 

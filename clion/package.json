@@ -8,11 +8,11 @@
     "build": "wtsc"
   },
   "dependencies": {
-    "parsimmon": "^1.6.4"
+    "parsimmon": "^1.7.3"
   },
   "devDependencies": {
     "@types/chai": "^4.1.2",
-    "@types/parsimmon": "^1.6.1",
+    "@types/parsimmon": "^1.6.2",
     "chai": "^4.1.2"
   }
 }

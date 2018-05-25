@@ -5,7 +5,7 @@ import * as S from 'better-sqlite3'
 sources.add(
 `Read an SQLite database`,
   y.object(),
-  Sequence(URI, OPT_OBJECT),
+  Sequence(URI, OPT_OBJECT).name`SQlite Options`,
   function sqlite(opts, [file, sources]) {
 
   return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {
