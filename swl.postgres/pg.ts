@@ -124,9 +124,7 @@ sinks.add(
             values: columns.map(c => payload[c])
           })
 
-        } else if (ev.type === 'exec') {
-          // await (this as any)[ev.method](ev.options, ev.body)
-        }
+        } else yield ev
       }
 
     }
