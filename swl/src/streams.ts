@@ -123,8 +123,9 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
       this.should_drain = true
   }
 
-  close<U extends NodeJS.WritableStream>(this: StreamWrapper<U>) {
+  async close<U extends NodeJS.WritableStream>(this: StreamWrapper<U>) {
     this.stream.end()
+    await this.ended.promise
   }
 
 }

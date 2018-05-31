@@ -1,7 +1,8 @@
 
-import {Sequence, sources, Chunk, ChunkIterator, y, sinks, URI, OPT_OBJECT} from 'swl'
+import {Sequence, sources, Chunk, ChunkIterator, y, sinks, URI, OPT_OBJECT, StreamWrapper} from 'swl'
 import * as pg from 'pg'
-
+import * as _ from 'csv-stringify'
+const copy_from = require('pg-copy-streams').from
 
 sources.add(
 `Read from a PostgreSQL database`,
@@ -51,6 +52,16 @@ sources.add(
 }, 'postgres', 'pg')
 
 
+/**
+ * COPY ${table}(${heads.join(', ')}) FROM STDIN
+				WITH
+				DELIMITER AS ';'
+				CSV HEADER
+				QUOTE AS '"'
+				ESCAPE AS '"'
+				NULL AS 'NULL'
+ */
+
 sinks.add(
 `Write to a PostgreSQL Database`,
   y.object({
@@ -68,11 +79,30 @@ sinks.add(
       var table: string = ''
       var columns: string[] = []
       var start = false
-      var text = ''
-      var query_name = ''
+      var wr: StreamWrapper<NodeJS.WritableStream> = null!
+      var columns_str: string = ''
+
+      /**
+       * Flush the data into the destination table. This is where
+       * we try to know if we're going to upsert or just plain insert.
+       */
+      async function flush() {
+        if (!wr) return
+
+        await wr.close()
+
+        await db.query(`
+          INSERT INTO "${table}"(${columns_str}) (SELECT ${columns_str} FROM "temp_${table}")
+        `)
+
+        await db.query(`
+          DROP TABLE "temp_${table}"
+        `)
+      }
 
       for await (var ev of upstream) {
         if (ev.type === 'start') {
+          await flush()
           start = true
           table = ev.name
         } else if (ev.type === 'data') {
@@ -91,41 +121,52 @@ sinks.add(
 
             // Create if not exists ?
             // Temporary ?
+
             await db.query(`
               CREATE TABLE IF NOT EXISTS "${table}" (
                 ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
               )
             `)
 
-            if (mode === 'insert') {
-              query_name = `swl-query-insert-${table}`
-              text = `INSERT INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
-              values (${columns.map((c, i) => `$${i + 1}`).join(', ')})`
-              // console.log(sql)
-            }
-            else if (mode === 'upsert') {
-              query_name = `swl-query-insert-${table}`
-              // Should I do some sub-query thing with coalesce ?
-              // I would need some kind of primary key...
-              text = `INSERT OR REPLACE INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
-                values (${columns.map((c, i) => `$${i + 1}`).join(', ')})`
-            }
+            await db.query(`
+              CREATE TEMP TABLE "temp_${table}" (
+                ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
+              )
+            `)
 
+            columns_str = columns.map(c => `"${c}"`).join(', ')
 
             if (opts.truncate) {
               await db.query(`DELETE FROM "${table}"`)
             }
+
+            var stream: NodeJS.WritableStream = await db.query(copy_from(`COPY ${table}(${columns_str}) FROM STDIN
+            WITH
+            DELIMITER AS ';'
+            CSV HEADER
+            QUOTE AS '"'
+            ESCAPE AS '"'
+            NULL AS 'NULL'`)) as any
+
+            var csv: NodeJS.ReadWriteStream = _({
+              delimiter: ';',
+              header: true,
+              quote: '"',
+              // escape: true
+            })
+
+            csv.pipe(stream)
+            wr = new StreamWrapper(csv)
+
             start = false
           }
 
-          await db.query({
-            name: query_name,
-            text,
-            values: columns.map(c => payload[c])
-          })
+          await wr.write(payload)
 
         } else yield ev
       }
+
+      await flush()
 
     }
 
