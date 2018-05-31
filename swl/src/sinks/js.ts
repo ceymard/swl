@@ -3,11 +3,12 @@ import { transformers, ChunkIterator, Chunk } from '../pipeline'
 import * as y from 'yup'
 
 transformers.add(
-`Build a javascript function and run it.`,
+  `Build a javascript function and run it.`,
   y.object({}),
   null,
   function js(opts, rest) {
 
+    const R = require('ramda')
     var fn: Function = eval(rest)
 
     return async function* (upstream: ChunkIterator): ChunkIterator {
