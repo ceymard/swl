@@ -12,6 +12,7 @@ const num = c.hsl(120, 60, 60)
 const constant = c.hsl(0, 60, 60)
 const bool = c.hsl(280, 60, 60)
 const coll = c.hsl(220, 60, 60)
+const info = c.hsl(40, 60, 60)
 
 export function print_value(out: NodeJS.WritableStream, obj: any, outside = true) {
 
@@ -68,6 +69,8 @@ sink handled the chunks without passing them along.`,
           process.stdout.write('\n')
         }
           // console.log(`${collection}:${nb++} ${inspect(event.payload, {colors: true, depth: null, breakLength: Infinity})}`)
+      } else if (ch.type === 'info') {
+        process.stdout.write(info(`${ch.source}: `) + ch.message + '\n')
       } else
         console.log(`${inspect(ch, {colors: true, depth: null, breakLength: Infinity})}`)
 

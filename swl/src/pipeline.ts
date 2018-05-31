@@ -6,6 +6,7 @@ export type ChunkType =
 'start'
 | 'data'
 | 'exec'
+| 'info'
 
 export interface ChunkBase {
   type: ChunkType
@@ -28,7 +29,15 @@ export interface ExecChunk extends ChunkBase {
   body: string
 }
 
-export type Chunk = StartChunk | DataChunk | ExecChunk
+export interface InfoChunk extends ChunkBase {
+  type: 'info'
+  level: number
+  source: string
+  message: string
+  payload: any
+}
+
+export type Chunk = StartChunk | DataChunk | ExecChunk | InfoChunk
 
 export namespace Chunk {
   export function data(payload: any): DataChunk {
@@ -37,6 +46,10 @@ export namespace Chunk {
 
   export function start(name: string): StartChunk {
     return {type: 'start', name}
+  }
+
+  export function info(source: string, message: string, payload?: any): InfoChunk {
+    return {type: 'info', source, message, payload, level: 10}
   }
 }
 

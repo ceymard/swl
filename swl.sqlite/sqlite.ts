@@ -7,12 +7,12 @@ sources.add(
   y.object(),
   Sequence(URI, OPT_OBJECT).name`SQlite Options`,
   function sqlite(opts, [file, sources]) {
+    const info = (message: string) => Chunk.info(file, message)
 
   return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {
     yield* upstream
 
     const db = new S(file, opts)
-    // Throw error if db doesn't exist ! (unless option specifically allows for that)
 
     var keys = Object.keys(sources||{})
     if (keys.length === 0) {
@@ -30,11 +30,13 @@ sources.add(
 
       var stmt = db.prepare(sql)
 
+      yield info(`Started ${colname}`)
       yield Chunk.start(colname)
       for (var s of (stmt as any).iterate()) {
         yield Chunk.data(s)
       }
     }
+    yield info('done')
 
   }
 
@@ -51,6 +53,8 @@ sinks.add(
   URI,
   function sqlite(opts, file) {
     const mode: 'insert' | 'upsert' | 'update' = 'insert'
+    const name = `${file}`
+    const info = (message: string) => Chunk.info(name, message)
 
     async function* run(db: S, upstream: ChunkIterator): ChunkIterator {
 
@@ -58,6 +62,7 @@ sinks.add(
       var columns: string[] = []
       var start = false
       var stmt: any
+      var sql = ''
 
       for await (var ev of upstream) {
         if (ev.type === 'start') {
@@ -74,16 +79,18 @@ sinks.add(
             : 'text')
 
             if (opts.drop) {
-              db.exec(`DROP TABLE IF EXISTS "${table}"`)
+              sql = `DROP TABLE IF EXISTS "${table}"`
+              yield info(sql)
+              db.exec(sql)
             }
 
             // Create if not exists ?
             // Temporary ?
-            db.exec(`
-              CREATE TABLE IF NOT EXISTS "${table}" (
+            sql = `CREATE TABLE IF NOT EXISTS "${table}" (
                 ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
-              )
-            `)
+              )`
+            yield info(sql)
+            db.exec(sql)
 
             if (mode === 'insert') {
               const sql = `INSERT INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
@@ -91,6 +98,7 @@ sinks.add(
               // console.log(sql)
               stmt = db.prepare(sql)
             }
+
             else if (mode === 'upsert')
               // Should I do some sub-query thing with coalesce ?
               // I would need some kind of primary key...
@@ -99,16 +107,16 @@ sinks.add(
 
 
             if (opts.truncate) {
-              db.exec(`DELETE FROM "${table}"`)
+              sql = `DELETE FROM "${table}"`
+              yield info(sql)
+              db.exec(sql)
             }
             start = false
           }
 
           stmt.run(...columns.map(c => coerce(payload[c])))
 
-        } else if (ev.type === 'exec') {
-          // await (this as any)[ev.method](ev.options, ev.body)
-        }
+        } else yield ev
       }
 
     }
