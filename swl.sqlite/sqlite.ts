@@ -2,6 +2,22 @@
 import {Sequence, OPT_OBJECT, URI, y, sources, ChunkIterator, Chunk, sinks} from 'swl'
 import * as S from 'better-sqlite3'
 
+function coalesce_join(sep: string, ...a: (string|null|number)[]) {
+  var r = []
+  var l = a.length
+  for (var i = 0; i < l; i++) {
+    var b = ('' + (a[i]||'')).trim()
+    if (b) r.push(b)
+  }
+  return r.join(sep)
+}
+
+function cleanup(str: string) {
+  return (str||'').trim()
+    .replace(/\s+/g, ' ')
+    .replace(/\s*-\s*/g, '-')
+}
+
 sources.add(
 `Read an SQLite database`,
   y.object(),
@@ -13,6 +29,8 @@ sources.add(
     yield* upstream
 
     const db = new S(file, opts)
+    db.register({name: 'coalesce_join', varargs: true, deterministic: true, safeIntegers: true}, coalesce_join)
+    db.register({name: 'cleanup', varargs: false, deterministic: true, safeIntegers: true}, cleanup)
 
     var keys = Object.keys(sources||{})
     if (keys.length === 0) {
