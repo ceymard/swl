@@ -73,13 +73,13 @@ sinks.add(
   function postgres(opts, uri) {
     // const uri = URI.tryParse(rest.trim())
     const mode: 'insert' | 'upsert' | 'update' = 'insert'
+    var wr: StreamWrapper<NodeJS.WritableStream> = null!
 
     async function* run(db: pg.Client, upstream: ChunkIterator): ChunkIterator {
 
       var table: string = ''
       var columns: string[] = []
       var start = false
-      var wr: StreamWrapper<NodeJS.WritableStream> = null!
       var columns_str: string = ''
 
       /**
@@ -91,8 +91,17 @@ sinks.add(
 
         await wr.close()
 
+        const db_cols = (await db.query(`
+          select json_object_agg(column_name, data_type) as res
+            from information_schema.columns
+          where table_name = '${table}'
+        `)).rows[0].res
+
+        const expr = columns.map(c => `"${c}"::${db_cols[c]}`)
+          .join(', ')
+
         await db.query(`
-          INSERT INTO "${table}"(${columns_str}) (SELECT ${columns_str} FROM "temp_${table}")
+          INSERT INTO "${table}"(${columns_str}) (SELECT ${expr} FROM "temp_${table}")
         `)
 
         await db.query(`
@@ -187,6 +196,11 @@ sinks.add(
         yield* run(db, upstream)
         await db.query('COMMIT')
       } catch (e) {
+        // We have to close wr to make sure we can pass the next
+        // query, as it will have them freeze otherwise.
+        if (wr)
+          await wr.close()
+
         await db.query('ROLLBACK')
         throw e
       } finally {
