@@ -92,7 +92,7 @@ sinks.add(
         await wr.close()
 
         const db_cols = (await db.query(`
-          select json_object_agg(column_name, data_type) as res
+          select json_object_agg(column_name, udt_name) as res
             from information_schema.columns
           where table_name = '${table}'
         `)).rows[0].res

@@ -176,6 +176,24 @@ sinks.add(
   'sqlite', '.db', '.sqlite3', '.sqlite'
 )
 
+const re_date = /^$/
+const re_boolean = /^true|false$/i
+
+export function uncoerce(value: any) {
+  if (typeof value === 'string') {
+    var trimmed = value.trim()
+    if (trimmed.match(re_date)) {
+      return new Date(trimmed)
+    }
+
+    if (trimmed.match(re_boolean)) {
+      return trimmed.toLowerCase() === 'true'
+    }
+  }
+
+  return value
+}
+
 
 export function coerce(value: any) {
   const typ = typeof value
