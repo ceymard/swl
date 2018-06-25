@@ -91,6 +91,7 @@ export const BOOL_PROP = Sequence(
     S``
   ),
   R(/[^,\)\]\s]+/),
+  __
 ).map(([no, val]) => { return {[val]: !no} })
 .name `Boolean Property`
 
