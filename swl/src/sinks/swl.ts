@@ -10,12 +10,23 @@ import * as y from 'yup'
 async function build_swl_file_pipeline(path: string, argv: any[], opts: any) {
   const contents = readFileSync(path, 'utf-8')
     .replace(/^#[^\n]*\n?/mg, '')
-    .replace(/\$\{((?:\\\}|[^\}])+)\}/g, (match, val) => {
-      var fn = new Function('_', 'options', 'env', `return ${val}`)
-      return fn(argv, opts, process.env)
+    .replace(/\$\{((?:\\\}|\\\||[^\}])+(\|(?:\\\}|[^\}])+)?)\}/g, (match, val, def) => {
+      const res = argv[val]
+        || opts[val]
+        || def
+      if (res === undefined)
+        throw new Error(`in ${path}: No script argument value found for '${val}'`)
+      return res
+      // var fn = new Function('_', 'options', 'env', `return ${val}`)
+      // return fn(argv, opts, process.env)
     })
 
-  return await build_pipeline(FRAGMENTS.tryParse(contents))
+  try {
+    return await build_pipeline(FRAGMENTS.tryParse(contents))
+  } catch (e) {
+    console.error(`in ${path}: ${e.message}`)
+    throw e
+  }
 }
 
 
@@ -27,6 +38,7 @@ sources.add(
     ARRAY_CONTENTS
   ),
   async function swl(opts, [file, argv]) {
+    // console.log(opts)
     return build_swl_file_pipeline(file, argv, opts)
   },
   'swl', '.swl'
