@@ -20,7 +20,9 @@ function cleanup(str: string) {
 
 sources.add(
 `Read an SQLite database`,
-  y.object(),
+  y.object({
+    uncoerce: y.boolean().default(false),
+  }),
   Sequence(URI, OPT_OBJECT).name`SQlite Options`,
   function sqlite(opts, [file, sources]) {
     const info = (message: string) => Chunk.info(file, message)
@@ -28,7 +30,8 @@ sources.add(
   return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {
     yield* upstream
 
-    const db = new S(file, opts)
+    const db = new S(file, {readonly: true, fileMustExist: true})
+    const opt_uncoerce = opts.uncoerce
     db.register({name: 'coalesce_join', varargs: true, deterministic: true, safeIntegers: true}, coalesce_join)
     db.register({name: 'cleanup', varargs: false, deterministic: true, safeIntegers: true}, cleanup)
 
@@ -51,6 +54,12 @@ sources.add(
       yield info(`Started ${colname}`)
       yield Chunk.start(colname)
       for (var s of (stmt as any).iterate()) {
+        if (opt_uncoerce) {
+          var s2: any = {}
+          for (var x in s)
+            s2[x] = uncoerce(s[x])
+          s = s2
+        }
         yield Chunk.data(s)
       }
     }
@@ -176,12 +185,12 @@ sinks.add(
   'sqlite', '.db', '.sqlite3', '.sqlite'
 )
 
-const re_date = /^$/
+const re_date = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?:\d{2}(?:\.\d{3}Z?)))?$/
 const re_boolean = /^true|false$/i
 
 export function uncoerce(value: any) {
   if (typeof value === 'string') {
-    var trimmed = value.trim()
+    var trimmed = value.trim().toLowerCase()
     if (trimmed.match(re_date)) {
       return new Date(trimmed)
     }
@@ -189,6 +198,9 @@ export function uncoerce(value: any) {
     if (trimmed.match(re_boolean)) {
       return trimmed.toLowerCase() === 'true'
     }
+
+    if (trimmed === 'null')
+      return null
   }
 
   return value
