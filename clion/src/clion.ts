@@ -1,7 +1,6 @@
 
 import * as P from 'parsimmon'
 import {inspect} from 'util'
-import { WSAEACCES } from 'constants';
 
 export const i = parseInt
 
@@ -73,7 +72,7 @@ export const DATE = R(re_date).map(r => {
   return new Date(i(year), i(month) - 1, i(day), i(hh)||0, i(mm)||0, i(ss)||0)
 }).name `Date`
 
-export const VALUE: P.Parser<any> = Either(
+export const WS_VALUE: P.Parser<any> = Either(
   P.lazy(() => ARRAY),
   Sequence(S`{`, P.lazy(() => OBJECT), S`}`)
     .map(([_1, res, _2]) => res),
@@ -82,6 +81,8 @@ export const VALUE: P.Parser<any> = Either(
   REGEXP,
   SINGLE_VALUE
 ).name `Value`
+
+export const VALUE = Sequence(WS_VALUE, __).map(([v, _]) => v)
 
 export const BOOL_PROP = Sequence(
   Either(
