@@ -140,7 +140,9 @@ sources.add(
 
 sinks.add(
 `Write collections to a workbook`,
-  y.object({}),
+  y.object({
+    compression: y.boolean().default(true)
+  }),
   URI,
   function xlsx(opts, uri) {
 
@@ -172,7 +174,7 @@ sinks.add(
 
       write_sheet()
       if (name !== null)
-        XLSX.writeFile(wb, uri)
+        XLSX.writeFile(wb, uri, {compression: opts.compression})
     }
 
   },
