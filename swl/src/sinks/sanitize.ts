@@ -8,9 +8,9 @@ function san(str: string): string {
   // if (typeof cached !== 'undefined') return cached
   // Remove accents
   const res = str.normalize('NFD').replace(/[\u0300-\u036f]/g, "")
-  .replace(/[-\.:;\n\s+]/gm, '_')
+  .replace(/[-\.:;\n \t\n\r+_]+/gm, '_')
   // only keep ascii characters, numbers, and a few useful characters like punctutation
-    .replace(/[^\w-0-9_\/\\!?,:; \s\n\{\}]/gm, '')
+    .replace(/[^\w-0-9_/\\!?,:; \s\n\{\}]/gm, '')
     .trim()
     .toLowerCase()
   // _cache[str] = res
