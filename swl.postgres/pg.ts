@@ -68,11 +68,11 @@ sinks.add(
     truncate: y.boolean().default(false).label('Truncate tables before loading'),
     notice: y.boolean().default(true).label('Show notices on console'),
     drop: y.boolean().default(false).label('Drop tables'),
+    upsert: y.object({}).default({}).label('Upsert Column Name')
   }),
   URI,
   function postgres(opts, uri) {
     // const uri = URI.tryParse(rest.trim())
-    const mode: 'insert' | 'upsert' | 'update' = 'insert'
     var wr: StreamWrapper<NodeJS.WritableStream> = null!
 
     async function* run(db: pg.Client, upstream: ChunkIterator): ChunkIterator {
@@ -92,16 +92,25 @@ sinks.add(
         await wr.close()
 
         const db_cols = (await db.query(`
-          select json_object_agg(column_name, udt_name) as res
-            from information_schema.columns
-          where table_name = '${table}'
+        select json_object_agg(column_name, udt_name) as res
+        from information_schema.columns
+        where table_name = '${table}'
         `)).rows[0].res
 
         const expr = columns.map(c => `"${c}"::${db_cols[c]}`)
-          .join(', ')
+        .join(', ')
+
+        var upsert = ""
+        if (opts.upsert) {
+          var up = (opts.upsert as any)[table]
+          if (typeof up === 'string') {
+            upsert = ` on conflict on constraint "${up}" do update set ${columns.map(c => `${c} = EXCLUDED.${c}`)} `
+          }
+        }
 
         await db.query(`
           INSERT INTO "${table}"(${columns_str}) (SELECT ${expr} FROM "temp_${table}")
+          ${upsert}
         `)
 
         await db.query(`
@@ -149,7 +158,7 @@ sinks.add(
               await db.query(`DELETE FROM "${table}"`)
             }
 
-            var stream: NodeJS.WritableStream = await db.query(copy_from(`COPY ${table}(${columns_str}) FROM STDIN
+            var stream: NodeJS.WritableStream = await db.query(copy_from(`COPY temp_${table}(${columns_str}) FROM STDIN
             WITH
             DELIMITER AS ';'
             CSV HEADER

@@ -18,6 +18,16 @@ function cleanup(str: string) {
     .replace(/\s*-\s*/g, '-')
 }
 
+var cache: {[name: string]: number} = {}
+function counter(name: string, start: number) {
+  var res = cache[name] = (cache[name] || start) + 1
+  return res
+}
+
+function reset_counter(name: string) {
+  delete cache[name]
+}
+
 sources.add(
 `Read an SQLite database`,
   y.object({
@@ -34,6 +44,8 @@ sources.add(
     const opt_uncoerce = opts.uncoerce
     db.register({name: 'coalesce_join', varargs: true, deterministic: true, safeIntegers: true}, coalesce_join)
     db.register({name: 'cleanup', varargs: false, deterministic: true, safeIntegers: true}, cleanup)
+    db.register({name: 'counter', varargs: false, deterministic: false, safeIntegers: true}, counter)
+    db.register({name: 'reset_counter', varargs: false, deterministic: false, safeIntegers: true}, reset_counter)
 
     var keys = Object.keys(sources||{})
     if (keys.length === 0) {
