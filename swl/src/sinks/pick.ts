@@ -1,31 +1,42 @@
-import { ChunkIterator, sinks, Chunk } from '../pipeline'
+import { ChunkIterator, Sink, Chunk, register } from '../pipeline'
 import { ARRAY_CONTENTS } from 'clion'
-import * as y from 'yup'
 
-sinks.add(
-`Pick properties from records`,
-  y.object(),
-  ARRAY_CONTENTS,
-  function pick(opts, def) {
 
-    return async function *pick(upstream: ChunkIterator): ChunkIterator {
-      for await (var ev of upstream) {
-        if (ev.type === 'data') {
-          var obj: any = {}
-          var p = ev.payload
-          for (var d of def) {
-            if (typeof d === 'string' || typeof d === 'number') {
-              obj[d] = p[d]
-            } if (d instanceof RegExp) {
-              for (var x in p) {
-                if (x.match(d))
-                  obj[x] = p[x]
-              }
-            }
-          }
-          yield Chunk.data(obj)
-        } else yield ev
+@register('pick')
+export class Pick extends Sink<{}, any[]> {
+  help = `Pick properties from records`
+  options_parser = null
+  body_parser = ARRAY_CONTENTS
 
+  regexps: RegExp[] = []
+  props: Set<string|number> = new Set()
+
+  async init() {
+    for (var p of this.body) {
+      if (typeof p === 'string' || typeof p === 'number')
+        this.props.add(p)
+      else if (p instanceof RegExp)
+        this.regexps.push(p)
     }
   }
-}, 'pick')
+
+  async *onData(chunk: Chunk.Data): ChunkIterator {
+
+    var p = chunk.payload
+    var result: any = {}
+
+    for (var x in p) {
+      if (this.props.has(x))
+        result[x] = p[x]
+      else {
+        for (var r of this.regexps) {
+          if (r.test(x))
+            result[x] = p[x]
+        }
+      }
+    }
+
+    yield Chunk.data(result)
+
+  }
+}

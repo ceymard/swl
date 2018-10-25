@@ -8,50 +8,53 @@ export type ChunkType =
 | 'exec'
 | 'info'
 
-export interface ChunkBase {
-  type: ChunkType
-}
-
-export interface StartChunk extends ChunkBase {
-  type: 'start'
-  name: string
-}
-
-export interface DataChunk extends ChunkBase {
-  type: 'data'
-  payload: any
-}
-
-export interface ExecChunk extends ChunkBase {
-  type: 'exec'
-  method: string
-  options: any
-  body: string
-}
-
-export interface InfoChunk extends ChunkBase {
-  type: 'info'
-  level: number
-  source: string
-  message: string
-  payload: any
-}
-
-export type Chunk = StartChunk | DataChunk | ExecChunk | InfoChunk
-
 export namespace Chunk {
-  export function data(payload: any): DataChunk {
+  export interface ChunkBase {
+    type: ChunkType
+  }
+
+  export interface Start extends ChunkBase {
+    type: 'start'
+    name: string
+  }
+
+  export interface Data extends ChunkBase {
+    type: 'data'
+    payload: any
+  }
+
+  export interface Exec extends ChunkBase {
+    type: 'exec'
+    method: string
+    options: any
+    body: string
+  }
+
+  export interface Info extends ChunkBase {
+    type: 'info'
+    level: number
+    source: string
+    message: string
+    payload: any
+  }
+
+  export function data(payload: any): Data {
     return {type: 'data', payload}
   }
 
-  export function start(name: string): StartChunk {
+  export function start(name: string): Start {
     return {type: 'start', name}
   }
 
-  export function info(source: string, message: string, payload?: any): InfoChunk {
+  export function info(source: string, message: string, payload?: any): Info {
     return {type: 'info', source, message, payload, level: 10}
   }
+
 }
+
+
+export type Chunk = Chunk.Start | Chunk.Data | Chunk.Exec | Chunk.Info
+
 
 export type ChunkIterator = AsyncIterableIterator<Chunk>
 
@@ -103,16 +106,6 @@ export function condition(fn: (a: any) => any, handlers: Handler[]) {
 
 
 import * as p from 'path'
-import * as y from 'yup'
-
-
-export interface FactoryObject {
-  help: string,
-  factory: Factory<any, any>
-  parser: Parser<any> | null
-  schema: y.ObjectSchema<any>
-  mimes: string[]
-}
 
 
 export type Unpromise<T> =
@@ -130,8 +123,8 @@ export type Un<T> =
  * parser find them.
 */
 export class FactoryContainer {
-  map = {} as {[name: string]: FactoryObject | undefined}
-  all = [] as FactoryObject[]
+  map = {} as {[name: string]: new () => PipelineComponent<any, any> | undefined}
+  all = [] as {component: (new () => PipelineComponent<any, any>), mimes: string[]}[]
 
   /**
    * Add a factory to the registry
@@ -139,13 +132,10 @@ export class FactoryContainer {
    * @param factory The factory function
    * @param mimes Extensions or mime types that this handler accepts
    */
-  add<T, U>(help: string, schema: y.ObjectSchema<T>, parser: Parser<U>, factory: Factory<T, Un<U>>, ...mimes: string[]): void
-  add<T>(help: string, schema: y.ObjectSchema<T>, parser: null, factory: Factory<T, string>, ...mimes: string[]): void
-  add<T, U>(help: string, schema: y.ObjectSchema<T>, parser: null | Parser<U>, factory: Factory<T, U>, ...mimes: string[]) {
-    const factory_object = {help, factory, schema, parser, mimes}
-    this.all.push(factory_object)
+  add(mimes: string[], component: new () => PipelineComponent<any, any>) {
+    this.all.push({component, mimes})
     for (var name of mimes) {
-      this.map[name] = factory_object
+      this.map[name] = component
     }
   }
 
@@ -161,28 +151,29 @@ export class FactoryContainer {
    * @param options Provided options to the factory
    * @param rest The rest of the command line string
    */
-  async get(name: string, options: any, rest: string): Promise<Handler | Handler[] | null> {
-    var handler = this.map[name]
+  async get(name: string, options: any, rest: string): Promise<PipelineComponent<any, any> | null> {
+    var factory = this.map[name]
 
-    if (!handler) {
+    if (!factory) {
       const re_uri = /^([\w]+):\/\//
       const match = re_uri.exec(name)
       if (match) {
-        handler = this.map[match[1]]
+        factory = this.map[match[1]]
         rest = `${name.replace(match[0], '')} ${rest}`
       }
     }
 
-    if (!handler) {
+    if (!factory) {
       const a = p.parse(name)
-      handler = this.map[a.ext]
+      factory = this.map[a.ext]
       rest = rest ? name + ' ' + rest : name
     }
 
-    if (!handler) return null
+    if (!factory) return null
 
-    var opts = handler.schema.cast(options)
-    const parser = handler.parser
+    var handler = new factory()!
+    handler.options = handler.options_parser ? handler.options_parser.deserialize(options) : options
+    const parser = handler.body_parser
     var parsed: any = rest
     if (parser) {
       const result = parser.parse(rest)
@@ -201,14 +192,15 @@ export class FactoryContainer {
       parsed = await (Promise.all(parsed))
     }
 
-    return await handler.factory(opts, parsed)
+    await handler.init()
+    return handler
   }
 }
 
 
-export const sources = new FactoryContainer()
-export const sinks = new FactoryContainer()
-export const transformers = new FactoryContainer()
+const sources = new FactoryContainer()
+const sinks = new FactoryContainer()
+const transformers = new FactoryContainer()
 
 
 export function instantiate_pipeline(handlers: Handler[]) {
@@ -228,7 +220,7 @@ export function instantiate_pipeline(handlers: Handler[]) {
 
 
 export async function build_pipeline(fragments: Fragment[]) {
-  const pipe = [] as Handler[]
+  const pipe = [] as PipelineComponent<any, any>[]
   for (var f of fragments) {
 
     var [_name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
@@ -249,24 +241,25 @@ export async function build_pipeline(fragments: Fragment[]) {
 }
 
 
-export class PipelineComponent {
+export function register(...aliases: string[]) {
+  return function (target: any) {
 
-  info(message: string, payload?: any, level = 10): InfoChunk {
-    return {
-      type: 'info',
-      level,
-      message,
-      payload,
-      source: this.constructor.name
-    }
   }
+}
 
-  data(payload: any): DataChunk {
-    return {
-      type: 'data',
-      payload
-    }
-  }
+
+export interface OptionsParser<T> {
+  deserialize(unk: unknown): T
+}
+
+
+export abstract class PipelineComponent<O, B> {
+
+  abstract help: string
+  abstract options_parser: OptionsParser<O> | null
+  options!: O
+  abstract body_parser: Parser<B> | null
+  body!: B
 
   async init() {
 
@@ -281,7 +274,8 @@ export class PipelineComponent {
 
 }
 
-export class Source extends PipelineComponent {
+
+export abstract class Source<O, B> extends PipelineComponent<O, B> {
 
   async *handle(upstream: ChunkIterator): ChunkIterator {
     // The source simply forwards everything from upstream
@@ -299,23 +293,16 @@ export class Source extends PipelineComponent {
 }
 
 
-export function register(...aliases: string[]) {
-  return function (target: any) {
-
-  }
-}
-
-
-export class Sink extends PipelineComponent {
+export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
 
   async *handle(upstream: ChunkIterator): ChunkIterator {
     for await (var chk of upstream) {
       if (chk.type === 'start') {
-        yield* this.onCollectionStart(chk.name)
+        yield* this.onCollectionStart(chk)
       } else if (chk.type === 'data') {
-        yield* this.onData(chk.payload)
+        yield* this.onData(chk)
       } else if (chk.type === 'info') {
-        yield* this.onInfo(chk.message, chk.payload, chk.level, chk.source)
+        yield* this.onInfo(chk)
       } else if (chk.type === 'exec') {
         var method = chk.method
         yield* (this as any)[method](chk.options, chk.body)
@@ -323,19 +310,15 @@ export class Sink extends PipelineComponent {
     }
   }
 
-  async *onCollectionStart(name: string): ChunkIterator {
+  async *onCollectionStart(chunk: Chunk.Start): ChunkIterator {
 
   }
 
-  async *onData(payload: any): ChunkIterator {
+  async *onData(payload: Chunk.Data): ChunkIterator {
 
   }
 
-  async *onExec(method: string, ): ChunkIterator {
-
-  }
-
-  async *onInfo(message: string, payload: any, level: number, source: string): ChunkIterator {
+  async *onInfo(chunk: Chunk.Info): ChunkIterator {
 
   }
 
@@ -346,6 +329,18 @@ export class Sink extends PipelineComponent {
  * A transformer is a sink, except it is expected of it that it
  * will keep forwarding stuff
  */
-export class Transformer extends Sink {
+export abstract class Transformer<O = {}, B = []> extends Sink<O, B> {
+
+  async *onCollectionStart(c: Chunk.Start): ChunkIterator {
+    yield c
+  }
+
+  async *onData(c: Chunk.Data): ChunkIterator {
+    yield c
+  }
+
+  async *onInfo(c: Chunk.Info): ChunkIterator {
+    yield c
+  }
 
 }

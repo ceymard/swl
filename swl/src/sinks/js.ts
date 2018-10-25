@@ -1,75 +1,55 @@
 
-import { transformers, ChunkIterator, Chunk } from '../pipeline'
-import * as y from 'yup'
-
-transformers.add(
-  `Build a javascript function and run it.`,
-  y.object({}),
-  null,
-  function js(opts, rest) {
-
-    const R = require('ramda')
-    var fn: Function = eval(rest)
-
-    return async function* (upstream: ChunkIterator): ChunkIterator {
-      // yield* upstream
-      var collection = ''
-      var i = 0
-      for await (var ch of upstream) {
-        if (ch.type === 'start') {
-          collection = ch.name
-          i = 0
-          yield ch
-        } else if (ch.type === 'data') {
-          i++
-          var res = fn(ch.payload, collection, i)
-          if (res[Symbol.iterator]) {
-            for (var r of res)
-              yield Chunk.data(r)
-          } else if (res[Symbol.asyncIterator]) {
-            for await (var r of res)
-              yield Chunk.data(r)
-          } else yield Chunk.data(res)
-
-        } else yield ch
-      }
-    }
-  },
-  'js'
-)
+import { register, Transformer, ChunkIterator, Chunk } from '../pipeline'
+import * as R from 'ramda'
 
 
-transformers.add(
-`A shortcut for a simple javascript function`,
-  y.object({}),
-  null,
-  function jsobj(opts, rest) {
+@register('js')
+export class Js extends Transformer<{}, string> {
 
-    var fn: Function = eval(`(_, collection, i) => { return {..._, ${rest}} }`)
+  help = `Build a javascript function and run it.`
+  options_parser = null
+  body_parser = null
 
-    return async function* (upstream: ChunkIterator): ChunkIterator {
-      // yield* upstream
-      var collection = ''
-      var i = 0
-      for await (var ch of upstream) {
-        if (ch.type === 'start') {
-          collection = ch.name
-          i = 0
-          yield ch
-        } else if (ch.type === 'data') {
-          i++
-          var res = fn(ch.payload, collection, i)
-          if (res[Symbol.iterator]) {
-            for (var r of res)
-              yield Chunk.data(r)
-          } else if (res[Symbol.asyncIterator]) {
-            for await (var r of res)
-              yield Chunk.data(r)
-          } else yield Chunk.data(res)
+  R = R
+  fn!: Function
+  nb = 0
+  current_collection = ''
 
-        } else yield ch
-      }
-    }
-  },
-  'jsobj'
-)
+  async init() {
+    this.fn = eval(this.body)
+  }
+
+  async *onCollectionStart(chk: Chunk.Start): ChunkIterator {
+    this.current_collection
+    this.nb = 0
+    yield chk
+  }
+
+  async *onData(chk: Chunk.Data): ChunkIterator {
+    var res = this.fn(chk.payload, this.current_collection, this.nb++) as any
+    if (res[Symbol.iterator]) {
+      for (var r of res)
+        yield Chunk.data(r)
+    } else if (res[Symbol.asyncIterator]) {
+      for await (var r of res)
+        yield Chunk.data(r)
+    } else yield Chunk.data(res)
+  }
+
+}
+
+
+@register('jsobj')
+export class JsObj extends Js {
+  help = `A shortcut for a simple javascript function
+
+  Use the '$' identifier in the body to reference the current object
+
+  example: jsobj prop: $.otherProp.method(), prop2: $.yetAnotherProperty
+  `
+
+  async init() {
+    this.fn = eval(`(_, collection, i) => { return {..._, ${this.body}} }`)
+  }
+
+}

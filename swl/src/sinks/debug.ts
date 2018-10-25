@@ -1,7 +1,6 @@
 
-import { transformers, ChunkIterator, sinks } from '../pipeline'
-import { inspect } from 'util'
-import * as y from 'yup'
+import { ChunkIterator, Transformer, register, Sink, Chunk } from '../pipeline'
+import * as s from '../slz'
 
 import ch from 'chalk'
 
@@ -41,54 +40,59 @@ export function print_value(out: NodeJS.WritableStream, obj: any, outside = true
   }
 }
 
-transformers.add(
-`Print chunks to the console.
 
-Note that a debug sink is always appended by default
--- if it prints nothing it is because another
-sink handled the chunks without passing them along.`,
-  y.object({
-    data: y.boolean().default(true),
-    other: y.boolean().default(true)
-  }),
-  null,
-  function debug(opts) {
+const DEBUG_OPTIONS = s.object({
+  data: s.boolean().default(true),
+  other: s.boolean().default(true)
+})
 
-  return async function *(upstream: ChunkIterator): ChunkIterator {
-    var collection = ''
-    var nb = 0
 
-    for await (var ch of upstream) {
-      if (ch.type === 'start') {
-        collection = ch.name
-        nb = 1
-      } else if (ch.type === 'data') {
-        if (opts.data) {
-          process.stdout.write(coll(collection + ':' + nb++ + ' '))
-          print_value(process.stdout, ch.payload)
-          process.stdout.write('\n')
-        }
-          // console.log(`${collection}:${nb++} ${inspect(event.payload, {colors: true, depth: null, breakLength: Infinity})}`)
-      } else if (ch.type === 'info') {
-        process.stdout.write(info(`${ch.source}: `) + ch.message + '\n')
-      } else
-        console.log(`${inspect(ch, {colors: true, depth: null, breakLength: Infinity})}`)
+@register('debug')
+export class DebugTransformer extends Transformer<{data: boolean, other: boolean}, []> {
 
-      yield ch
-    }
+  help = `Print chunks to the console.
+
+  Note that a debug sink is always appended by default
+  -- if it prints nothing it is because another
+  sink handled the chunks without passing them along.`
+
+  options_parser = DEBUG_OPTIONS
+  body_parser = null
+
+  current_collection: string = ''
+  nb = 0
+
+  async *onCollectionStart(chunk: Chunk.Start): ChunkIterator {
+    this.current_collection = chunk.name
+    this.nb = 0
+    yield chunk
   }
-}, 'debug')
 
-sinks.add(
-  `Drop chunks`,
-  y.object(),
-  null,
-  function nulll() {
-    return async function *(upstream: ChunkIterator): ChunkIterator {
-      for await (var ch of upstream) {
-        // do nothing, yield nothing
-        ch
-      }
+  async *onData(chunk: Chunk.Data): ChunkIterator {
+
+    if (this.options.data) {
+      this.nb++
+      process.stdout.write(coll(`${this.current_collection}: ${this.nb} `))
+      print_value(process.stdout, chunk.payload)
+      process.stdout.write('\n')
     }
-  }, 'null'
-)
+
+    yield chunk
+  }
+
+  async *onInfo(chunk: Chunk.Info): ChunkIterator {
+    process.stdout.write(info(`${chunk.source}: `) + chunk.message + '\n')
+    yield chunk
+  }
+}
+
+
+
+@register('null')
+export class NullSink extends Sink {
+
+  options_parser = null
+  body_parser = null
+  help = `Lose the chunks and don't forward them.`
+
+}

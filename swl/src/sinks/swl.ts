@@ -1,5 +1,5 @@
 
-import { sources, build_pipeline, sinks } from '../pipeline'
+import { Source, build_pipeline, Sink } from '../pipeline'
 import { ARRAY_CONTENTS } from 'clion'
 import { URI, FRAGMENTS } from '../cmdparse'
 import * as P from 'parsimmon'

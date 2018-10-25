@@ -1,4 +1,4 @@
-import { URI_WITH_OPTS, make_write_creator, make_read_creator, sources, y, ChunkIterator, Chunk, StreamWrapper, sinks} from 'swl'
+import { URI_WITH_OPTS, make_write_creator, make_read_creator, sources, y, ChunkIterator, Chunk, StreamWrapper, register} from 'swl'
 
 import * as stringify from 'csv-stringify'
 const parse = require('csv-parser')

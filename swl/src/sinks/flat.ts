@@ -1,38 +1,31 @@
-import { ChunkIterator, transformers, Chunk } from '../pipeline'
+import { ChunkIterator, Transformer, Chunk, register } from '../pipeline'
 import { flatten as f, unflatten as u } from 'flat'
-import * as y from 'yup'
 
 
-transformers.add(
-`Flatten deep-nested properties to a simple object`,
-  y.object(),
-  null,
-  function flatten(opts) {
+@register('flatten')
+export class Flatten extends Transformer<{}, []> {
 
-    return async function *flatten(upstream: ChunkIterator): ChunkIterator {
-      for await (var ch of upstream) {
-        if (ch.type === 'data') {
-          yield Chunk.data(f(ch.payload, opts))
-        } else yield ch
-      }
-    }
+  help = `Flatten deep-nested properties to a simple object`
+  body_parser = null
+  options_parser = null
 
-  }, 'flatten'
-)
+  // FIXME we should make a suitable options_parser for Flatten
 
-transformers.add(
-`Unflatten an object to a deep nested structure`,
-  y.object(),
-  null,
-  function unflatten(opts) {
+  async *onData(chunk: Chunk.Data): ChunkIterator {
+    yield Chunk.data(f(chunk.payload, this.options))
+  }
+}
 
-    return async function *unflatten(upstream: ChunkIterator): ChunkIterator {
-      for await (var ch of upstream) {
-        if (ch.type === 'data') {
-          yield Chunk.data(u(ch.payload, opts))
-        } else yield ch
-      }
-    }
+@register('unflatten')
+export class UnFlatten extends Transformer<{}, []> {
 
-  }, 'unflatten'
-)
+  help = `Flatten deep-nested properties to a simple object`
+  body_parser = null
+  options_parser = null
+
+  // FIXME we should make a suitable options_parser for Flatten
+
+  async *onData(chunk: Chunk.Data): ChunkIterator {
+    yield Chunk.data(u(chunk.payload, this.options))
+  }
+}
