@@ -249,3 +249,103 @@ export async function build_pipeline(fragments: Fragment[]) {
 }
 
 
+export class PipelineComponent {
+
+  info(message: string, payload?: any, level = 10): InfoChunk {
+    return {
+      type: 'info',
+      level,
+      message,
+      payload,
+      source: this.constructor.name
+    }
+  }
+
+  data(payload: any): DataChunk {
+    return {
+      type: 'data',
+      payload
+    }
+  }
+
+  async init() {
+
+  }
+
+  /**
+   * Handle the chunk stream
+   */
+  async *handle(upstream: ChunkIterator): ChunkIterator {
+
+  }
+
+}
+
+export class Source extends PipelineComponent {
+
+  async *handle(upstream: ChunkIterator): ChunkIterator {
+    // The source simply forwards everything from upstream
+    yield* upstream
+    yield* this.emit()
+  }
+
+  /**
+   * This function must be redefined
+   */
+  async *emit(): ChunkIterator {
+
+  }
+
+}
+
+
+export function register(...aliases: string[]) {
+  return function (target: any) {
+
+  }
+}
+
+
+export class Sink extends PipelineComponent {
+
+  async *handle(upstream: ChunkIterator): ChunkIterator {
+    for await (var chk of upstream) {
+      if (chk.type === 'start') {
+        yield* this.onCollectionStart(chk.name)
+      } else if (chk.type === 'data') {
+        yield* this.onData(chk.payload)
+      } else if (chk.type === 'info') {
+        yield* this.onInfo(chk.message, chk.payload, chk.level, chk.source)
+      } else if (chk.type === 'exec') {
+        var method = chk.method
+        yield* (this as any)[method](chk.options, chk.body)
+      }
+    }
+  }
+
+  async *onCollectionStart(name: string): ChunkIterator {
+
+  }
+
+  async *onData(payload: any): ChunkIterator {
+
+  }
+
+  async *onExec(method: string, ): ChunkIterator {
+
+  }
+
+  async *onInfo(message: string, payload: any, level: number, source: string): ChunkIterator {
+
+  }
+
+}
+
+
+/**
+ * A transformer is a sink, except it is expected of it that it
+ * will keep forwarding stuff
+ */
+export class Transformer extends Sink {
+
+}

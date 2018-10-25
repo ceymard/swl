@@ -1,5 +1,5 @@
 
-import {Sequence, OPT_OBJECT, URI, y, sources, ChunkIterator, Chunk, sinks} from 'swl'
+import {Sequence, OPT_OBJECT, URI, y, sources, ChunkIterator, Chunk, sinks, Source, register} from 'swl'
 import * as S from 'better-sqlite3'
 
 function coalesce_join(sep: string, ...a: (string|null|number)[]) {
@@ -26,6 +26,84 @@ function counter(name: string, start: number) {
 
 function reset_counter(name: string) {
   delete cache[name]
+}
+
+
+@register('sqlite', 'sqlite3', '.db', '.sqlite', '.sqlite3')
+export class SqliteSource extends Source {
+  help = `Read an SQLite database`
+
+  options = y.object({
+    uncoerce: y.boolean().default(false),
+  })
+
+  // ????
+  uncoerce: boolean
+  filename: string
+  sources: {[name: string]: boolean | string}
+
+  body = Sequence(URI, OPT_OBJECT).name`SQlite Options`
+
+  db!: S
+
+  async init() {
+    this.db = new S(this.filename, {readonly: true, fileMustExist: true})
+
+    this.db.register({
+      name: 'coalesce_join',
+      varargs: true, deterministic: true, safeIntegers: true}, coalesce_join)
+    this.db.register({
+      name: 'cleanup',
+      varargs: false,
+      deterministic: true,
+      safeIntegers: true}, cleanup)
+    this.db.register({
+      name: 'counter',
+      varargs: false,
+      deterministic: false,
+      safeIntegers: true}, counter)
+    this.db.register({
+      name: 'reset_counter',
+      varargs: false,
+      deterministic: false, safeIntegers: true}, reset_counter)
+  }
+
+  async* emit(): ChunkIterator {
+    var sources = this.sources
+    var keys = Object.keys(sources||{})
+
+    if (keys.length === 0) {
+      // Auto-detect *tables* (not views)
+      // If no sources are specified, all the tables are outputed.
+      const st = this.db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
+      keys = st.all().map(k => k.name)
+    }
+
+    for (var colname of keys) {
+      var val = sources[colname]
+
+      var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
+      : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
+      : val
+
+      var stmt = this.db.prepare(sql)
+
+      yield this.info(`Started ${colname}`)
+      yield Chunk.start(colname)
+      for (var s of (stmt as any).iterate()) {
+        if (this.uncoerce) {
+          var s2: any = {}
+          for (var x in s)
+            s2[x] = uncoerce(s[x])
+          s = s2
+        }
+        yield this.data(s)
+      }
+    }
+    yield this.info('done')
+
+  }
+
 }
 
 sources.add(
