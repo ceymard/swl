@@ -6,11 +6,11 @@ export class Serializer<T> {
   public _help: string
 
   serialize(arg: T): unknown {
-    return null
+    return arg
   }
 
   deserialize(unk: unknown): T {
-    return null!
+    return unk as T
   }
 
   default(def: T) {
@@ -39,11 +39,11 @@ export class ObjectSerializer<T extends object> extends Serializer<T> {
   }
 
   deserialize(t: unknown): T {
-    return null!
+    return t as T
   }
 
   serialize(t: T) {
-
+    return t
   }
 
 }

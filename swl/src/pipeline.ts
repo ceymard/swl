@@ -105,45 +105,6 @@ export class ChunkStream {
   }
 }
 
-/**
- * Conditional pipeline. If the condition is met, then the value travels down
- * another subpipeline
- */
-// export function condition(fn: (a: any) => any, components: PipelineComponent<any, any>[]) {
-
-//   const lock = new Lock<any>()
-//   const end = Symbol()
-//   async function *fake_source(): ChunkIterator {
-//     do {
-//       var res = await lock.promise
-//     } while (res !== end)
-//   }
-
-//   components.unshift(fake_source)
-//   const pipeline = instantiate_pipeline(components)
-
-//   return async function *condition(upstream: ChunkIterator): ChunkIterator {
-//     for await (var chk of upstream) {
-//       if (fn(chk)) {
-//         // FIXME feed the pipeline
-//         lock.resolve(chk)
-//         const res = await pipeline.next()
-//         if (res.done)
-//           return
-//         yield res.value
-//       } else {
-//         yield chk
-//       }
-//     }
-//     // Once upstream is done, we send end down the pipeline
-//     // which should trigger the end of the fake_source and thus
-//     // trigger the possible sources that were inside this pipe.
-//     lock.resolve(end)
-//     // We now yield the rest of the pipeline
-//     yield* pipeline
-//   }
-// }
-
 
 import * as p from 'path'
 import { Lock } from './streams';
@@ -209,6 +170,7 @@ export class FactoryContainer {
       const result = parser.parse(rest)
       if (result.status) {
         parsed = await result.value
+        handler.body = parsed
       } else {
 
         // const offset = result.index.offset
