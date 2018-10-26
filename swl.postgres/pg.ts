@@ -1,5 +1,5 @@
 
-import {Sequence, Chunk, s, Sink, URI, OPT_OBJECT, StreamWrapper, Source, ParserType} from 'swl'
+import {Sequence, Chunk, s, Sink, URI, OPT_OBJECT, StreamWrapper, Source, ParserType, register} from 'swl'
 import * as pg from 'pg'
 import * as _ from 'csv-stringify'
 const copy_from = require('pg-copy-streams').from
@@ -9,6 +9,7 @@ const PG_SRC_OPTIONS = s.object({
 })
 const PG_SRC_BODY = Sequence(URI, OPT_OBJECT)
 
+@register('pg', 'postgres')
 export class PgSource extends Source<
   s.BaseType<typeof PG_SRC_OPTIONS>,
   ParserType<typeof PG_SRC_BODY>
@@ -76,6 +77,8 @@ const PG_SINK_OPTIONS = s.object({
   upsert: s.object({}).help`Upsert Column Name`
 })
 
+
+@register('pg', 'postgres')
 export class PgSink extends Sink<
   s.BaseType<typeof PG_SINK_OPTIONS>,
   ParserType<typeof URI>
