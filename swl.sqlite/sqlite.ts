@@ -2,6 +2,7 @@
 import {Sequence, OPT_OBJECT, URI, s, ChunkIterator, Chunk, Source, register, ParserType, Sink } from 'swl'
 import * as S from 'better-sqlite3'
 
+
 function coalesce_join(sep: string, ...a: (string|null|number)[]) {
   var r = []
   var l = a.length
@@ -104,15 +105,19 @@ export class SqliteSource extends Source<
       var stmt = this.db.prepare(sql)
 
       yield Chunk.info(this, `Started ${colname}`)
-      yield Chunk.start(colname)
-      for (var s of (stmt as any).iterate()) {
+      var iterator = (stmt as any).iterate() as IterableIterator<any>
+      var start = iterator.next()
+      if (!start.done) {
+        yield Chunk.start(colname, start.value)
+      }
+      for (var s of iterator) {
         if (this.uncoerce) {
           var s2: any = {}
           for (var x in s)
             s2[x] = uncoerce(s[x])
           s = s2
         }
-        yield Chunk.data(s)
+        yield Chunk.data(colname, s)
       }
     }
     yield Chunk.info(this, 'done')
@@ -143,17 +148,18 @@ export class SqliteSink extends Sink<
   table = ''
   db!: S
 
-  async *handle(upstream: ChunkIterator): ChunkIterator {
+  pragmas: {[name: string]: any} = {}
+  columns: string[] = []
+  stmt: {run(...a:any): any} = undefined!
+
+  async init() {
     const db = new S(await this.body, {})
     this.db = db
-    var pragma_journal: string = 'delete'
-    var sync: number = 0
-    var locking_mode: string = 'exclusive'
 
     if (this.options.pragma) {
-      pragma_journal = db.pragma('journal_mode', true)
-      sync = db.pragma('synchronous', true)
-      locking_mode = db.pragma('locking_mode', true)
+      this.pragmas.journal_mode = db.pragma('journal_mode', true)
+      this.pragmas.synchronous = db.pragma('synchronous', true)
+      this.pragmas.locking_mode = db.pragma('locking_mode', true)
 
       db.pragma('journal_mode = off')
       db.pragma('synchronous = 0')
@@ -161,140 +167,82 @@ export class SqliteSink extends Sink<
     }
 
     db.exec('BEGIN')
-    try {
-      yield* run(db, upstream)
-      db.exec('COMMIT')
-    } catch (e) {
-      db.exec('ROLLBACK')
-      throw e
-    } finally {
-      if (this.options.pragma) {
-        db.pragma(`journal_mode = ${pragma_journal}`)
-        db.pragma(`synchronous = ${sync}`)
-        db.pragma(`locking_mode = ${locking_mode}`)
+  }
+
+  async error(e: any) {
+    this.db.exec('ROLLBACK')
+    throw e
+  }
+
+  async end() {
+    this.db.exec('COMMIT')
+  }
+
+  async final() {
+    if (this.options.pragma) {
+      for (var x in this.pragmas) {
+        this.db.pragma(`${x} = ${this.pragmas[x]}`)
       }
     }
-
-    db.close()
+    if (this.db) this.db.close()
   }
 
 
+  /**
+   * Create the table, truncate it or drop it if necessary
+   */
+  async *onCollectionStart(start: Chunk.Start): ChunkIterator {
+
+    var sql = ''
+    var table = start.name
+    var payload = start.first_payload
+    var columns = Object.keys(payload)
+    this.columns = columns
+
+    var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
+    : payload[c] instanceof Buffer ? 'blob'
+    : 'text')
+
+    if (this.options.drop) {
+      sql = `DROP TABLE IF EXISTS "${table}"`
+      yield Chunk.info(this, sql)
+      this.db.exec(sql)
+    }
+
+    // Create if not exists ?
+    // Temporary ?
+    sql = `CREATE TABLE IF NOT EXISTS "${table}" (
+        ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
+      )`
+    yield Chunk.info(this, sql)
+    this.db.exec(sql)
+
+    if (this.mode === 'insert') {
+      const sql = `INSERT INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
+      values (${columns.map(c => '?').join(', ')})`
+      // console.log(sql)
+      this.stmt = this.db.prepare(sql)
+    }
+
+    else if (this.mode === 'upsert')
+      // Should I do some sub-query thing with coalesce ?
+      // I would need some kind of primary key...
+      this.stmt = this.db.prepare(`INSERT OR REPLACE INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
+        values (${columns.map(c => '?').join(', ')})`)
+
+
+    if (this.options.truncate) {
+      sql = `DELETE FROM "${table}"`
+      yield Chunk.info(this, sql)
+      this.db.exec(sql)
+    }
+  }
+
+  async *onData(data: Chunk.Data): ChunkIterator {
+    this.stmt.run(...this.columns.map(c => coerce(data.payload[c])))
+  }
 }
 
-sinks.add(
-`Write to a SQLite database`,
-  // y.object({
-  //   truncate: y.boolean().default(false).label('Truncate tables before loading'),
-  //   drop: y.boolean().default(false).label('Drop tables'),
-  //   pragma: y.boolean().default(true).label('Set pragmas before and revert them')
-  // }),
-  URI,
-  function sqlite(opts, file) {
-    const mode: 'insert' | 'upsert' | 'update' = 'insert'
-    const name = `${file}`
-    const info = (message: string) => Chunk.info(name, message)
-
-    async function* run(db: S, upstream: ChunkIterator): ChunkIterator {
-
-      var table: string = ''
-      var columns: string[] = []
-      var start = false
-      var stmt: any
-      var sql = ''
-
-      for await (var ev of upstream) {
-        if (ev.type === 'start') {
-          start = true
-          table = ev.name
-        } else if (ev.type === 'data') {
-          var payload = ev.payload
-
-          // Check if we need to create the table
-          if (start) {
-            columns = Object.keys(payload)
-            var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
-            : payload[c] instanceof Buffer ? 'blob'
-            : 'text')
-
-            if (opts.drop) {
-              sql = `DROP TABLE IF EXISTS "${table}"`
-              yield info(sql)
-              db.exec(sql)
-            }
-
-            // Create if not exists ?
-            // Temporary ?
-            sql = `CREATE TABLE IF NOT EXISTS "${table}" (
-                ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
-              )`
-            yield info(sql)
-            db.exec(sql)
-
-            if (mode === 'insert') {
-              const sql = `INSERT INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
-              values (${columns.map(c => '?').join(', ')})`
-              // console.log(sql)
-              stmt = db.prepare(sql)
-            }
-
-            else if (mode === 'upsert')
-              // Should I do some sub-query thing with coalesce ?
-              // I would need some kind of primary key...
-              stmt = db.prepare(`INSERT OR REPLACE INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
-                values (${columns.map(c => '?').join(', ')})`)
-
-
-            if (opts.truncate) {
-              sql = `DELETE FROM "${table}"`
-              yield info(sql)
-              db.exec(sql)
-            }
-            start = false
-          }
-
-          stmt.run(...columns.map(c => coerce(payload[c])))
-
-        } else yield ev
-      }
-
-    }
-
-    return async function *sqlite_writer(upstream: ChunkIterator): ChunkIterator {
-
-      const db = new S(file, {})
-      var pragma_journal: string = 'delete'
-      var sync: number = 0
-      var locking_mode: string = 'exclusive'
-
-
-      if (opts.pragma) {
-        pragma_journal = db.pragma('journal_mode', true)
-        sync = db.pragma('synchronous', true)
-        locking_mode = db.pragma('locking_mode', true)
-
-        db.pragma('journal_mode = off')
-        db.pragma('synchronous = 0')
-        db.pragma('locking_mode = EXCLUSIVE')
-      }
-
-      db.exec('BEGIN')
-      try {
-        yield* run(db, upstream)
-        db.exec('COMMIT')
-      } catch (e) {
-        db.exec('ROLLBACK')
-        throw e
-      } finally {
-        db.pragma(`journal_mode = ${pragma_journal}`)
-        db.pragma(`synchronous = ${sync}`)
-        db.pragma(`locking_mode = ${locking_mode}`)
-      }
-
-      db.close()
-    }
-  },
-  'sqlite', '.db', '.sqlite3', '.sqlite'
-)
 
 const re_date = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?:\d{2}(?:\.\d{3}Z?)))?$/
 const re_boolean = /^true|false$/i

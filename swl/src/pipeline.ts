@@ -9,42 +9,33 @@ export type ChunkType =
 | 'info'
 
 export namespace Chunk {
-  export interface ChunkBase {
-    type: ChunkType
-  }
-
-  export interface Start extends ChunkBase {
-    type: 'start'
-    name: string
-    first_payload: any
+  interface ChunkBase {
+    readonly type: ChunkType
   }
 
   export interface Data extends ChunkBase {
-    type: 'data'
-    payload: any
+    readonly type: 'data'
+    readonly collection: string
+    readonly payload: any
   }
 
   export interface Exec extends ChunkBase {
-    type: 'exec'
-    method: string
-    options: any
-    body: string
+    readonly type: 'exec'
+    readonly method: string
+    readonly options: any
+    readonly body: string
   }
 
   export interface Info extends ChunkBase {
-    type: 'info'
-    level: number
-    source: string
-    message: string
-    payload: any
+    readonly type: 'info'
+    readonly level: number
+    readonly source: string
+    readonly message: string
+    readonly payload: any
   }
 
-  export function data(payload: any): Data {
-    return {type: 'data', payload}
-  }
-
-  export function start(name: string, first: any): Start {
-    return {type: 'start', name, first_payload: first}
+  export function data(collection: string, payload: any): Data {
+    return {type: 'data', payload, collection}
   }
 
   export function info(source: any, message: string, payload?: any): Info {
@@ -54,10 +45,7 @@ export namespace Chunk {
 }
 
 
-export type Chunk = Chunk.Start | Chunk.Data | Chunk.Exec | Chunk.Info
-
-
-export type ChunkIterator = AsyncIterableIterator<Chunk>
+export type Chunk = Chunk.Data | Chunk.Exec | Chunk.Info
 
 
 /**
@@ -101,6 +89,7 @@ export type ChunkIterator = AsyncIterableIterator<Chunk>
 
 
 import * as p from 'path'
+import { Lock } from './streams';
 
 /**
  * We use this class to store named factories so that the command
@@ -192,16 +181,16 @@ export const transformers = new FactoryContainer()
  * next component as upstream()
  * @param components The pipeline of components to connect.
  */
-export function instantiate_pipeline(components: PipelineComponent<any, any>[], initial?: ChunkIterator) {
+export function instantiate_pipeline(components: PipelineComponent<any, any>[], initial?: PipelineComponent<any, any>) {
 
   async function *start_generator(): ChunkIterator {
     return
   }
   // Connect the handlers between themselves
   // console.log('toto ?', handlers[0].name)
-  var comp = components[0].trueHandle(initial ? initial : start_generator())
+  var comp = components[0].handleWrap(initial ? initial : start_generator())
   for (var c of components.slice(1)) {
-    comp = c.trueHandle(comp)
+    comp = c.handleWrap(comp)
   }
 
   return comp
@@ -255,6 +244,9 @@ export interface OptionsParser<T> {
 }
 
 
+export const MAX_STACK_SIZE = 1024
+
+
 export abstract class PipelineComponent<O, B> {
 
   abstract help: string
@@ -262,6 +254,28 @@ export abstract class PipelineComponent<O, B> {
   options!: O
   abstract body_parser: Parser<B> | null
   body!: B
+  upstream!: PipelineComponent<any, any>
+
+  send_lock: Lock | null = null
+  fetch_lock: Lock | null = null
+  protected stack_size: number = 0
+
+  /**
+   * Send chunks down the pipeline
+   * @param chk The Chunk to send. If null, it means this
+   *  component is finished sending stuff.
+   * @returns null if the sending went well or a Lock if its stack_size
+   *  reached size limit.
+   */
+  send(chk: Chunk | null): null | Lock {
+    return null
+  }
+
+  fetch(): Chunk | Lock | null {
+    if (this.stack_size === 0)
+      return new Lock()
+    return null
+  }
 
   async init() {
 
@@ -271,25 +285,30 @@ export abstract class PipelineComponent<O, B> {
 
   }
 
+  async final() {
+
+  }
+
   async error(e: any) {
 
   }
 
-  async *trueHandle(upstream: ChunkIterator): ChunkIterator {
+  async handleWrap() {
     try {
       await this.init()
-      yield* this.handle(upstream)
+      await this.process()
+      await this.end()
     } catch (e) {
       await this.error(e)
     } finally {
-      await this.end()
+      await this.final()
     }
   }
 
   /**
    * Handle the chunk stream
    */
-  async *handle(upstream: ChunkIterator): ChunkIterator {
+  async process() {
 
   }
 
@@ -298,16 +317,22 @@ export abstract class PipelineComponent<O, B> {
 
 export abstract class Source<O, B> extends PipelineComponent<O, B> {
 
-  async *handle(upstream: ChunkIterator): ChunkIterator {
+  async process() {
     // The source simply forwards everything from upstream
-    yield* upstream
-    yield* this.emit()
+    var next: Chunk | null | Lock
+    while (next = await this.upstream.fetch()) {
+      if (next instanceof Lock)
+        await next.promise
+      else
+        this.send(next)
+    }
+    await this.emit()
   }
 
   /**
    * This function must be redefined
    */
-  async *emit(): ChunkIterator {
+  async emit() {
 
   }
 
@@ -316,23 +341,40 @@ export abstract class Source<O, B> extends PipelineComponent<O, B> {
 
 export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
 
-  async *handle(upstream: ChunkIterator): ChunkIterator {
-    for await (var chk of upstream) {
-      if (chk.type === 'start') {
-        yield* this.onCollectionStart(chk)
-      } else if (chk.type === 'data') {
-        yield* this.onData(chk)
+  async process() {
+    var current_collection: string | null = null
+
+    var chk: Chunk | null | Lock
+    while (chk = this.upstream.fetch()) {
+
+      if (chk instanceof Lock) {
+        await chk.promise
+        continue
+      }
+
+      if (chk.type === 'data') {
+        if (current_collection !== chk.collection) {
+          if (current_collection !== null)
+            await this.onCollectionEnd(current_collection)
+          current_collection = chk.collection
+          this.onCollectionStart(chk)
+        }
+        await this.onData(chk)
       } else if (chk.type === 'info') {
-        yield* this.onInfo(chk)
+        await this.onInfo(chk)
       } else if (chk.type === 'exec') {
         var method = chk.method
-        yield* (this as any)[method](chk.options, chk.body)
+        await (this as any)[method](chk.options, chk.body)
       }
     }
   }
 
-  async *onCollectionStart(chunk: Chunk.Start): ChunkIterator {
-    yield chunk
+  async onCollectionStart(chunk: Chunk.Data) {
+
+  }
+
+  async onCollectionEnd(name: string) {
+
   }
 
   async *onData(chunk: Chunk.Data): ChunkIterator {

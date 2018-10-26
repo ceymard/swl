@@ -33,11 +33,8 @@ export class Sanitize extends Transformer<s.BaseType<typeof SANITIZE_OPTIONS>, s
   body_parser = null
   column_cache = {} as  {[s: string]: string}
 
-  async *onCollectionStart(chunk: Chunk.Start): ChunkIterator {
-    yield this.options.collections ? Chunk.start(san(chunk.name)) : chunk
-  }
-
   async *onData(chunk: Chunk.Data): ChunkIterator {
+    var ocolname = this.options.collections
     var ocolumns = this.options.columns
     var ovalues = this.options.values
     var column_cache = this.column_cache
@@ -52,8 +49,7 @@ export class Sanitize extends Transformer<s.BaseType<typeof SANITIZE_OPTIONS>, s
     for (var x in p) {
       n[ocolumns ? (column_cache[x] = column_cache[x] || san(x)) : x] = ovalues && typeof p[x] === 'string' ? san(p[x]) : p[x]
     }
-    yield Chunk.data(n)
-
+    yield Chunk.data(ocolname ? san(chunk.collection) : chunk.collection, n)
   }
 
 }
