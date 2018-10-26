@@ -84,7 +84,9 @@ export class ChunkStream {
     }
 
     if (this.stack_size >= MAX_STACK_SIZE || chunk === null) {
-      this.fetch_lock.resolve()
+      var fe = this.fetch_lock
+      this.fetch_lock = new Lock
+      fe.resolve()
     }
 
     if (this.stack_size >= MAX_STACK_SIZE) {
@@ -98,6 +100,7 @@ export class ChunkStream {
     if (!start) {
       if (this.finished)
         return null
+
       return this.fetch_lock.promise
     }
 
@@ -108,7 +111,9 @@ export class ChunkStream {
 
     if (!this.start) {
       this.end = null
-      this.send_lock.resolve()
+      var snd = this.send_lock
+      this.send_lock = new Lock
+      snd.resolve()
     }
 
     return chunk
@@ -238,7 +243,7 @@ export function instantiate_pipeline(components: PipelineComponent<any, any>[], 
   // Connect the handlers between themselves
   var stream = initial
   for (var c of components) {
-    c.runComponent(stream)
+    c.runComponent(stream).catch(e => console.error(e.stack))
     stream = c.stream
   }
 
@@ -273,7 +278,7 @@ export interface OptionsParser<T> {
 }
 
 
-export const MAX_STACK_SIZE = 1024
+export const MAX_STACK_SIZE = 10
 
 
 export abstract class PipelineComponent<O, B> {
@@ -286,10 +291,6 @@ export abstract class PipelineComponent<O, B> {
 
   upstream!: ChunkStream
   stream = new ChunkStream()
-
-  send_lock: Lock | null = null
-  fetch_lock: Lock | null = null
-  protected stack_size: number = 0
 
   /**
    * Send chunks down the pipeline
@@ -377,7 +378,6 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
 
     var chk: Chunk | Promise<any> | null
     while (chk = this.upstream.next()) {
-
       if (chk instanceof Promise) {
         await chk
         continue
@@ -388,7 +388,7 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
           if (current_collection !== null)
             await this.onCollectionEnd(current_collection)
           current_collection = chk.collection
-          this.onCollectionStart(chk)
+          await this.onCollectionStart(chk)
         }
         await this.onData(chk)
       } else if (chk.type === 'info') {

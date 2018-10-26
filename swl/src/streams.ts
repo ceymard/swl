@@ -48,8 +48,7 @@ export class Lock<T = void> {
   resolve(value: T): void
   resolve(value?: T) {
     if (!this._resolve) {
-      // this.promise
-      return
+      this.promise
     }
     const res = this._resolve!
     this.reset()

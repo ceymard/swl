@@ -93,4 +93,16 @@ export class NullSink extends Sink {
   body_parser = null
   help = `Lose the chunks and don't forward them.`
 
+  async onData() {
+
+  }
+
+  async onInfo() {
+
+  }
+
+  async onExec() {
+
+  }
+
 }

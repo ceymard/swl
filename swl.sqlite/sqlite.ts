@@ -113,6 +113,7 @@ export class SqliteSource extends Source<
             s2[x] = uncoerce(s[x])
           s = s2
         }
+
         await this.send(Chunk.data(colname, s))
       }
     }
