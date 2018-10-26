@@ -1,25 +1,39 @@
 
-import {Sequence, sources, Chunk, ChunkIterator, y, sinks, URI, OPT_OBJECT, StreamWrapper} from 'swl'
+import {Sequence, Chunk, s, Sink, URI, OPT_OBJECT, StreamWrapper, Source, ParserType} from 'swl'
 import * as pg from 'pg'
 import * as _ from 'csv-stringify'
 const copy_from = require('pg-copy-streams').from
 
-sources.add(
-`Read from a PostgreSQL database`,
-  y.object(),
-  Sequence(URI, OPT_OBJECT),
-  async function postgres(options, [uri, src]) {
-    var sources = src || {}
+const PG_SRC_OPTIONS = s.object({
 
-  return async function *(upstream: ChunkIterator): ChunkIterator {
-    yield* upstream
+})
+const PG_SRC_BODY = Sequence(URI, OPT_OBJECT)
 
-    uri = `postgres://${uri}`
+export class PgSource extends Source<
+  s.BaseType<typeof PG_SRC_OPTIONS>,
+  ParserType<typeof PG_SRC_BODY>
+> {
+  help = `Read from a PostgreSQL database`
+  body_parser = PG_SRC_BODY
+  options_parser = PG_SRC_OPTIONS
+
+  sources: {[name: string]: boolean | string} = {}
+  db!: pg.Client
+
+  async emit() {
+    var [_uri, sources] = this.body
+    var uri = `postgres://${await _uri}`
+
+    if (sources)
+      this.sources = sources
+
     const db = new pg.Client(uri)
     await db.connect()
+    this.db = db
 
     var keys = Object.keys(sources)
     if (keys.length === 0) {
+      // Get the list of all the tables if we did not know them.
       const tables = await db.query(`
         SELECT * FROM information_schema.tables
         WHERE table_schema = 'public'
@@ -30,7 +44,6 @@ sources.add(
       }
       keys = Object.keys(sources)
     }
-    // console.log(sources)
 
     for (var colname of keys) {
       var val = sources[colname]
@@ -41,180 +54,158 @@ sources.add(
 
       const result = await db.query(sql)
 
-      yield Chunk.start(colname)
       for (var s of result.rows) {
-        yield Chunk.data(s)
+        await this.send(Chunk.data(colname, s))
       }
     }
 
-    await db.end()
   }
-}, 'postgres', 'pg')
+
+  async end() {
+    await this.db.end()
+  }
+
+}
 
 
-/**
- * COPY ${table}(${heads.join(', ')}) FROM STDIN
-				WITH
-				DELIMITER AS ';'
-				CSV HEADER
-				QUOTE AS '"'
-				ESCAPE AS '"'
-				NULL AS 'NULL'
- */
 
-sinks.add(
-`Write to a PostgreSQL Database`,
-  y.object({
-    truncate: y.boolean().default(false).label('Truncate tables before loading'),
-    notice: y.boolean().default(true).label('Show notices on console'),
-    drop: y.boolean().default(false).label('Drop tables'),
-    upsert: y.object({}).default({}).label('Upsert Column Name')
-  }),
-  URI,
-  function postgres(opts, uri) {
-    // const uri = URI.tryParse(rest.trim())
-    var wr: StreamWrapper<NodeJS.WritableStream> = null!
+const PG_SINK_OPTIONS = s.object({
+  truncate: s.boolean(false).default(false).help`Truncate tables before loading`,
+  notice: s.boolean(true).default(true).help`Show notices on console`,
+  drop: s.boolean(false).default(false).help`Drop tables`,
+  upsert: s.object({}).help`Upsert Column Name`
+})
 
-    async function* run(db: pg.Client, upstream: ChunkIterator): ChunkIterator {
+export class PgSink extends Sink<
+  s.BaseType<typeof PG_SINK_OPTIONS>,
+  ParserType<typeof URI>
+> {
+  help = `Write to a PostgreSQL Database`
+  options_parser = PG_SINK_OPTIONS
+  body_parser = URI
 
-      var table: string = ''
-      var columns: string[] = []
-      var start = false
-      var columns_str: string = ''
+  wr: StreamWrapper<NodeJS.WritableStream> | null = null
+  db!: pg.Client
+  columns!: string[]
+  columns_str!: string
 
-      /**
-       * Flush the data into the destination table. This is where
-       * we try to know if we're going to upsert or just plain insert.
-       */
-      async function flush() {
-        if (!wr) return
+  async init() {
+    const db = new pg.Client(`postgres://${await this.body}`)
+    await db.connect()
 
-        await wr.close()
-
-        const db_cols = (await db.query(`
-        select json_object_agg(column_name, udt_name) as res
-        from information_schema.columns
-        where table_name = '${table}'
-        `)).rows[0].res
-
-        const expr = columns.map(c => `"${c}"::${db_cols[c]}`)
-        .join(', ')
-
-        var upsert = ""
-        if (opts.upsert) {
-          var up = (opts.upsert as any)[table]
-          if (typeof up === 'string') {
-            upsert = ` on conflict on constraint "${up}" do update set ${columns.map(c => `${c} = EXCLUDED.${c}`)} `
-          }
-        }
-
-        await db.query(`
-          INSERT INTO "${table}"(${columns_str}) (SELECT ${expr} FROM "temp_${table}")
-          ${upsert}
-        `)
-
-        await db.query(`
-          DROP TABLE "temp_${table}"
-        `)
-      }
-
-      for await (var ev of upstream) {
-        if (ev.type === 'start') {
-          await flush()
-          start = true
-          table = ev.name
-        } else if (ev.type === 'data') {
-          var payload = ev.payload
-
-          // Check if we need to create the table
-          if (start) {
-            columns = Object.keys(payload)
-            var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
-            : payload[c] instanceof Buffer ? 'blob'
-            : 'text')
-
-            if (opts.drop) {
-              await db.query(`DROP TABLE IF EXISTS "${table}"`)
-            }
-
-            // Create if not exists ?
-            // Temporary ?
-
-            await db.query(`
-              CREATE TABLE IF NOT EXISTS "${table}" (
-                ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
-              )
-            `)
-
-            await db.query(`
-              CREATE TEMP TABLE "temp_${table}" (
-                ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
-              )
-            `)
-
-            columns_str = columns.map(c => `"${c}"`).join(', ')
-
-            if (opts.truncate) {
-              await db.query(`DELETE FROM "${table}"`)
-            }
-
-            var stream: NodeJS.WritableStream = await db.query(copy_from(`COPY temp_${table}(${columns_str}) FROM STDIN
-            WITH
-            DELIMITER AS ';'
-            CSV HEADER
-            QUOTE AS '"'
-            ESCAPE AS '"'
-            NULL AS 'NULL'`)) as any
-
-            var csv: NodeJS.ReadWriteStream = _({
-              delimiter: ';',
-              header: true,
-              quote: '"',
-              // escape: true
-            })
-
-            csv.pipe(stream)
-            wr = new StreamWrapper(csv)
-
-            start = false
-          }
-
-          await wr.write(payload)
-
-        } else yield ev
-      }
-
-      await flush()
-
+    if (this.options.notice) {
+      db.on('notice', (notice: Error) => {
+        const _ = notice as Error & {severity: string}
+        this.send(Chunk.info(this, `pg ${_.severity}: ${_.message}`))
+      })
     }
 
-    return async function *postgres(upstream: ChunkIterator): ChunkIterator {
+    await db.query('BEGIN')
+  }
 
-      const db = new pg.Client(`postgres://${await uri}`)
-      await db.connect()
+  async end() {
+    await this.db.query('COMMIT')
+  }
 
-      if (opts.notice) {
-        db.on('notice', (notice: Error) => {
-          const _ = notice as Error & {severity: string}
-          console.log(`pg ${_.severity}: ${_.message}`)
-        })
-      }
+  async final() {
+    if (this.wr)
+      await this.wr.close()
+    await this.db.end()
+  }
 
-      try {
-        await db.query('BEGIN')
-        yield* run(db, upstream)
-        await db.query('COMMIT')
-      } catch (e) {
-        // We have to close wr to make sure we can pass the next
-        // query, as it will have them freeze otherwise.
-        if (wr)
-          await wr.close()
+  async error(err: any) {
+    await this.db.query('ROLLBACK')
+    throw err
+  }
 
-        await db.query('ROLLBACK')
-        throw e
-      } finally {
-        await db.end()
+  async onCollectionStart(chunk: Chunk.Data) {
+    var payload = chunk.payload
+    var table = chunk.collection
+    const columns = this.columns = Object.keys(payload)
+    var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
+    : payload[c] instanceof Buffer ? 'blob'
+    : 'text')
+
+    if (this.options.drop) {
+      await this.db.query(`DROP TABLE IF EXISTS "${table}"`)
+    }
+
+    // Create the table if it didn't exist
+    await this.db.query(`
+      CREATE TABLE IF NOT EXISTS "${table}" (
+        ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
+      )
+    `)
+
+    // Create a temporary table that will receive all the data through pg COPY
+    // command
+    await this.db.query(`
+      CREATE TEMP TABLE "temp_${table}" (
+        ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
+      )
+    `)
+
+    this.columns_str = columns.map(c => `"${c}"`).join(', ')
+
+    if (this.options.truncate) {
+      await this.db.query(`DELETE FROM "${table}"`)
+    }
+
+    var stream: NodeJS.WritableStream = await this.db.query(copy_from(`COPY temp_${table}(${this.columns_str}) FROM STDIN
+    WITH
+    DELIMITER AS ';'
+    CSV HEADER
+    QUOTE AS '"'
+    ESCAPE AS '"'
+    NULL AS 'NULL'`)) as any
+
+    var csv: NodeJS.ReadWriteStream = _({
+      delimiter: ';',
+      header: true,
+      quote: '"',
+      // escape: true
+    })
+
+    csv.pipe(stream)
+    this.wr = new StreamWrapper(csv)
+  }
+
+  async onData(chunk: Chunk.Data) {
+    await this.wr!.write(chunk.payload)
+  }
+
+  async onCollectionEnd(table: string) {
+    if (!this.wr)
+      throw new Error('wr is not existing')
+
+    await this.wr.close()
+    this.wr = null
+
+    const db_cols = (await this.db.query(`
+    select json_object_agg(column_name, udt_name) as res
+    from information_schema.columns
+    where table_name = '${table}'
+    `)).rows[0].res as {[name: string]: string}
+
+    const expr = this.columns.map(c => `"${c}"::${db_cols[c]}`)
+    .join(', ')
+
+    var upsert = ""
+    if (this.options.upsert) {
+      var up = (this.options.upsert as any)[table]
+      if (typeof up === 'string') {
+        upsert = ` on conflict on constraint "${up}" do update set ${this.columns.map(c => `${c} = EXCLUDED.${c}`)} `
       }
     }
-  }, 'postgres', 'pg'
-)
+
+    await this.db.query(`
+      INSERT INTO "${table}"(${this.columns_str}) (SELECT ${expr} FROM "temp_${table}")
+      ${upsert}
+    `)
+
+    await this.db.query(`
+      DROP TABLE "temp_${table}"
+    `)
+
+  }
+}
