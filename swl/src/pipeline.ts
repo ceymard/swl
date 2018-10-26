@@ -1,4 +1,4 @@
-import { Lock } from './streams'
+// import { Lock } from './streams'
 import { Parser } from 'parsimmon'
 import { Fragment, ADAPTER_AND_OPTIONS } from './cmdparse'
 
@@ -16,6 +16,7 @@ export namespace Chunk {
   export interface Start extends ChunkBase {
     type: 'start'
     name: string
+    first_payload: any
   }
 
   export interface Data extends ChunkBase {
@@ -42,12 +43,12 @@ export namespace Chunk {
     return {type: 'data', payload}
   }
 
-  export function start(name: string): Start {
-    return {type: 'start', name}
+  export function start(name: string, first: any): Start {
+    return {type: 'start', name, first_payload: first}
   }
 
-  export function info(source: string, message: string, payload?: any): Info {
-    return {type: 'info', source, message, payload, level: 10}
+  export function info(source: any, message: string, payload?: any): Info {
+    return {type: 'info', source: source.constructor.name, message, payload, level: 10}
   }
 
 }
@@ -58,65 +59,48 @@ export type Chunk = Chunk.Start | Chunk.Data | Chunk.Exec | Chunk.Info
 
 export type ChunkIterator = AsyncIterableIterator<Chunk>
 
-export type Handler = (upstream: ChunkIterator) => ChunkIterator
-
-export type AsyncFactory<T, U> = (options: T, parsed: U) => Promise<Handler | Handler[]>
-export type SyncFactory<T, U> = (options: T, parsed: U) => Handler | Handler[]
-export type Factory<T, U> = SyncFactory<T, U> | AsyncFactory<T, U>
-
 
 /**
  * Conditional pipeline. If the condition is met, then the value travels down
  * another subpipeline
  */
-export function condition(fn: (a: any) => any, handlers: Handler[]) {
+// export function condition(fn: (a: any) => any, components: PipelineComponent<any, any>[]) {
 
-  const lock = new Lock<any>()
-  const end = Symbol()
-  async function *fake_source(): ChunkIterator {
-    do {
-      var res = await lock.promise
-    } while (res !== end)
-  }
+//   const lock = new Lock<any>()
+//   const end = Symbol()
+//   async function *fake_source(): ChunkIterator {
+//     do {
+//       var res = await lock.promise
+//     } while (res !== end)
+//   }
 
-  handlers.unshift(fake_source)
-  const pipeline = instantiate_pipeline(handlers)
+//   components.unshift(fake_source)
+//   const pipeline = instantiate_pipeline(components)
 
-  return async function *condition(upstream: ChunkIterator): ChunkIterator {
-    for await (var chk of upstream) {
-      if (fn(chk)) {
-        // FIXME feed the pipeline
-        lock.resolve(chk)
-        const res = await pipeline.next()
-        if (res.done)
-          return
-        yield res.value
-      } else {
-        yield chk
-      }
-    }
-    // Once upstream is done, we send end down the pipeline
-    // which should trigger the end of the fake_source and thus
-    // trigger the possible sources that were inside this pipe.
-    lock.resolve(end)
-    // We now yield the rest of the pipeline
-    yield* pipeline
-  }
-}
+//   return async function *condition(upstream: ChunkIterator): ChunkIterator {
+//     for await (var chk of upstream) {
+//       if (fn(chk)) {
+//         // FIXME feed the pipeline
+//         lock.resolve(chk)
+//         const res = await pipeline.next()
+//         if (res.done)
+//           return
+//         yield res.value
+//       } else {
+//         yield chk
+//       }
+//     }
+//     // Once upstream is done, we send end down the pipeline
+//     // which should trigger the end of the fake_source and thus
+//     // trigger the possible sources that were inside this pipe.
+//     lock.resolve(end)
+//     // We now yield the rest of the pipeline
+//     yield* pipeline
+//   }
+// }
 
 
 import * as p from 'path'
-
-
-export type Unpromise<T> =
-  T extends Promise<infer A> ? A
-  : T
-
-export type Un<T> =
-  T extends [infer A, infer B, infer C] ? [Unpromise<A>, Unpromise<B>, Unpromise<C>]
-  : T extends [infer A, infer B] ? [Unpromise<A>, Unpromise<B>]
-  : Unpromise<T>
-
 
 /**
  * We use this class to store named factories so that the command
@@ -198,24 +182,29 @@ export class FactoryContainer {
 }
 
 
-const sources = new FactoryContainer()
-const sinks = new FactoryContainer()
-const transformers = new FactoryContainer()
+export const sources = new FactoryContainer()
+export const sinks = new FactoryContainer()
+export const transformers = new FactoryContainer()
 
 
-export function instantiate_pipeline(handlers: Handler[]) {
+/**
+ * Connect all the pipeline by sending their generators to the
+ * next component as upstream()
+ * @param components The pipeline of components to connect.
+ */
+export function instantiate_pipeline(components: PipelineComponent<any, any>[], initial?: ChunkIterator) {
 
   async function *start_generator(): ChunkIterator {
     return
   }
   // Connect the handlers between themselves
   // console.log('toto ?', handlers[0].name)
-  var handler = handlers[0](start_generator())
-  for (var h of handlers.slice(1)) {
-    handler = h(handler)
+  var comp = components[0].trueHandle(initial ? initial : start_generator())
+  for (var c of components.slice(1)) {
+    comp = c.trueHandle(comp)
   }
 
-  return handler
+  return comp
 }
 
 
@@ -241,9 +230,22 @@ export async function build_pipeline(fragments: Fragment[]) {
 }
 
 
-export function register(...aliases: string[]) {
-  return function (target: any) {
-
+/**
+ * Register a component class
+ */
+export function register(...mimes: string[]) {
+  return function (target: new () => PipelineComponent<any, any>) {
+    var proto = Object.getPrototypeOf(target)
+    if (proto instanceof Source) {
+      sources.add(mimes, target)
+    } else if (proto instanceof Transformer) {
+      transformers.add(mimes, target)
+    } else if (proto instanceof Sink) {
+      sinks.add(mimes, target)
+    } else {
+      sources.add(mimes, target)
+      sinks.add(mimes, target)
+    }
   }
 }
 
@@ -263,6 +265,25 @@ export abstract class PipelineComponent<O, B> {
 
   async init() {
 
+  }
+
+  async end() {
+
+  }
+
+  async error(e: any) {
+
+  }
+
+  async *trueHandle(upstream: ChunkIterator): ChunkIterator {
+    try {
+      await this.init()
+      yield* this.handle(upstream)
+    } catch (e) {
+      await this.error(e)
+    } finally {
+      await this.end()
+    }
   }
 
   /**
@@ -311,15 +332,15 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
   }
 
   async *onCollectionStart(chunk: Chunk.Start): ChunkIterator {
-
+    yield chunk
   }
 
-  async *onData(payload: Chunk.Data): ChunkIterator {
-
+  async *onData(chunk: Chunk.Data): ChunkIterator {
+    yield chunk
   }
 
   async *onInfo(chunk: Chunk.Info): ChunkIterator {
-
+    yield chunk
   }
 
 }
@@ -330,17 +351,5 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
  * will keep forwarding stuff
  */
 export abstract class Transformer<O = {}, B = []> extends Sink<O, B> {
-
-  async *onCollectionStart(c: Chunk.Start): ChunkIterator {
-    yield c
-  }
-
-  async *onData(c: Chunk.Data): ChunkIterator {
-    yield c
-  }
-
-  async *onInfo(c: Chunk.Info): ChunkIterator {
-    yield c
-  }
 
 }

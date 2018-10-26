@@ -1,10 +1,11 @@
 
-import { Source, build_pipeline, Sink } from '../pipeline'
+import { build_pipeline, PipelineComponent, ChunkIterator, instantiate_pipeline } from '../pipeline'
 import { ARRAY_CONTENTS } from 'clion'
 import { URI, FRAGMENTS } from '../cmdparse'
+import { ParserType } from '../types'
+
 import * as P from 'parsimmon'
 import {readFileSync} from 'fs'
-import * as y from 'yup'
 
 
 async function build_swl_file_pipeline(path: string, argv: any[], opts: any) {
@@ -17,8 +18,6 @@ async function build_swl_file_pipeline(path: string, argv: any[], opts: any) {
       if (res === undefined)
         throw new Error(`in ${path}: No script argument value found for '${val}'`)
       return res
-      // var fn = new Function('_', 'options', 'env', `return ${val}`)
-      // return fn(argv, opts, process.env)
     })
 
   try {
@@ -30,29 +29,29 @@ async function build_swl_file_pipeline(path: string, argv: any[], opts: any) {
 }
 
 
-sources.add(
-  `Read swl statements from a file`,
-  y.object(),
-  P.seq(
-    URI,
-    ARRAY_CONTENTS
-  ),
-  async function swl(opts, [file, argv]) {
-    // console.log(opts)
-    return build_swl_file_pipeline(file, argv, opts)
-  },
-  'swl', '.swl'
+export const SWL_PARSER = P.seq(
+  URI,
+  ARRAY_CONTENTS
 )
 
-sinks.add(
-  `Read swl statements from a file`,
-  y.object(),
-  P.seq(
-    URI,
-    ARRAY_CONTENTS
-  ),
-  async function swl(opts, [file, argv]) {
-    return build_swl_file_pipeline(file, argv, opts)
-  },
-  'swl', '.swl'
-)
+
+export class Swl extends PipelineComponent<{}, ParserType<typeof SWL_PARSER>> {
+
+  help = `Read swl statements from a file`
+  options_parser = null
+  body_parser = SWL_PARSER
+
+  pipeline!: PipelineComponent<any, any>[]
+
+  async init() {
+    var file = await this.body[0]
+    var argv = this.body[1]
+    this.pipeline = await build_swl_file_pipeline(file, argv, this.options)
+  }
+
+  async *handle(upstream: ChunkIterator): ChunkIterator {
+    var pipe = instantiate_pipeline(this.pipeline, upstream)
+    yield* pipe
+  }
+
+}

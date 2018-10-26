@@ -1,5 +1,5 @@
 
-import {Sequence, OPT_OBJECT, URI, y, sources, ChunkIterator, Chunk, sinks, Source, register} from 'swl'
+import {Sequence, OPT_OBJECT, URI, s, ChunkIterator, Chunk, Source, register, ParserType, Sink } from 'swl'
 import * as S from 'better-sqlite3'
 
 function coalesce_join(sep: string, ...a: (string|null|number)[]) {
@@ -29,24 +29,35 @@ function reset_counter(name: string) {
 }
 
 
+const SQLITE_SOURCE_OPTIONS = s.object({
+  uncoerce: s.boolean(false)
+})
+
+const SQLITE_BODY = Sequence(URI, OPT_OBJECT).name`SQlite Options`
+
 @register('sqlite', 'sqlite3', '.db', '.sqlite', '.sqlite3')
-export class SqliteSource extends Source {
+export class SqliteSource extends Source<
+  s.BaseType<typeof SQLITE_SOURCE_OPTIONS>,
+  ParserType<typeof SQLITE_BODY>
+  >
+{
   help = `Read an SQLite database`
 
-  options = y.object({
-    uncoerce: y.boolean().default(false),
-  })
+  options_parser = SQLITE_SOURCE_OPTIONS
+  body_parser = SQLITE_BODY
 
   // ????
-  uncoerce: boolean
-  filename: string
-  sources: {[name: string]: boolean | string}
-
-  body = Sequence(URI, OPT_OBJECT).name`SQlite Options`
+  uncoerce!: boolean
+  filename!: string
+  sources!: {[name: string]: boolean | string}
 
   db!: S
 
   async init() {
+    this.filename = await this.body[0]
+    this.sources = this.body[1]
+    this.uncoerce = this.options.uncoerce
+
     this.db = new S(this.filename, {readonly: true, fileMustExist: true})
 
     this.db.register({
@@ -66,6 +77,10 @@ export class SqliteSource extends Source {
       name: 'reset_counter',
       varargs: false,
       deterministic: false, safeIntegers: true}, reset_counter)
+  }
+
+  async end() {
+    this.db.close()
   }
 
   async* emit(): ChunkIterator {
@@ -88,7 +103,7 @@ export class SqliteSource extends Source {
 
       var stmt = this.db.prepare(sql)
 
-      yield this.info(`Started ${colname}`)
+      yield Chunk.info(this, `Started ${colname}`)
       yield Chunk.start(colname)
       for (var s of (stmt as any).iterate()) {
         if (this.uncoerce) {
@@ -97,76 +112,82 @@ export class SqliteSource extends Source {
             s2[x] = uncoerce(s[x])
           s = s2
         }
-        yield this.data(s)
+        yield Chunk.data(s)
       }
     }
-    yield this.info('done')
+    yield Chunk.info(this, 'done')
 
   }
 
 }
 
-sources.add(
-`Read an SQLite database`,
-  y.object({
-    uncoerce: y.boolean().default(false),
-  }),
-  Sequence(URI, OPT_OBJECT).name`SQlite Options`,
-  function sqlite(opts, [file, sources]) {
-    const info = (message: string) => Chunk.info(file, message)
+export const SQLITE_SINK_OPTIONS = s.object({
+  truncate: s.boolean(false),
+  drop: s.boolean(false),
+  pragma: s.boolean(true)
+})
 
-  return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {
-    yield* upstream
+export const SQLITE_SINK_BODY = URI
 
-    const db = new S(file, {readonly: true, fileMustExist: true})
-    const opt_uncoerce = opts.uncoerce
-    db.register({name: 'coalesce_join', varargs: true, deterministic: true, safeIntegers: true}, coalesce_join)
-    db.register({name: 'cleanup', varargs: false, deterministic: true, safeIntegers: true}, cleanup)
-    db.register({name: 'counter', varargs: false, deterministic: false, safeIntegers: true}, counter)
-    db.register({name: 'reset_counter', varargs: false, deterministic: false, safeIntegers: true}, reset_counter)
+export class SqliteSink extends Sink<
+  s.BaseType<typeof SQLITE_SINK_OPTIONS>,
+  ParserType<typeof URI>
+> {
 
-    var keys = Object.keys(sources||{})
-    if (keys.length === 0) {
-      // Auto-detect *tables* (not views)
-      const st = db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
-      keys = st.all().map(k => k.name)
+  help = `Write to a SQLite database`
+  options_parser = SQLITE_SINK_OPTIONS
+  body_parser = URI
+
+  mode = 'insert' as 'insert' | 'upsert' | 'update'
+
+  table = ''
+  db!: S
+
+  async *handle(upstream: ChunkIterator): ChunkIterator {
+    const db = new S(await this.body, {})
+    this.db = db
+    var pragma_journal: string = 'delete'
+    var sync: number = 0
+    var locking_mode: string = 'exclusive'
+
+    if (this.options.pragma) {
+      pragma_journal = db.pragma('journal_mode', true)
+      sync = db.pragma('synchronous', true)
+      locking_mode = db.pragma('locking_mode', true)
+
+      db.pragma('journal_mode = off')
+      db.pragma('synchronous = 0')
+      db.pragma('locking_mode = EXCLUSIVE')
     }
 
-    for (var colname of keys) {
-      var val = sources[colname]
-
-      var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
-      : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
-      : val
-
-      var stmt = db.prepare(sql)
-
-      yield info(`Started ${colname}`)
-      yield Chunk.start(colname)
-      for (var s of (stmt as any).iterate()) {
-        if (opt_uncoerce) {
-          var s2: any = {}
-          for (var x in s)
-            s2[x] = uncoerce(s[x])
-          s = s2
-        }
-        yield Chunk.data(s)
+    db.exec('BEGIN')
+    try {
+      yield* run(db, upstream)
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    } finally {
+      if (this.options.pragma) {
+        db.pragma(`journal_mode = ${pragma_journal}`)
+        db.pragma(`synchronous = ${sync}`)
+        db.pragma(`locking_mode = ${locking_mode}`)
       }
     }
-    yield info('done')
 
+    db.close()
   }
 
-}, 'sqlite', '.db', '.sqlite3', '.sqlite')
 
+}
 
 sinks.add(
 `Write to a SQLite database`,
-  y.object({
-    truncate: y.boolean().default(false).label('Truncate tables before loading'),
-    drop: y.boolean().default(false).label('Drop tables'),
-    pragma: y.boolean().default(true).label('Set pragmas before and revert them')
-  }),
+  // y.object({
+  //   truncate: y.boolean().default(false).label('Truncate tables before loading'),
+  //   drop: y.boolean().default(false).label('Drop tables'),
+  //   pragma: y.boolean().default(true).label('Set pragmas before and revert them')
+  // }),
   URI,
   function sqlite(opts, file) {
     const mode: 'insert' | 'upsert' | 'update' = 'insert'
@@ -238,7 +259,7 @@ sinks.add(
 
     }
 
-    return async function *sqlite_reader(upstream: ChunkIterator): ChunkIterator {
+    return async function *sqlite_writer(upstream: ChunkIterator): ChunkIterator {
 
       const db = new S(file, {})
       var pragma_journal: string = 'delete'

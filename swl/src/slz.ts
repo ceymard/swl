@@ -2,7 +2,7 @@
 
 export class Serializer<T> {
 
-  private _default: T | undefined = undefined
+  protected _default: T | undefined = undefined
 
   serialize(arg: T): unknown {
     return null
@@ -33,7 +33,7 @@ export class ObjectSerializer<T extends object> extends Serializer<T> {
   }
 
   deserialize(t: unknown): T {
-
+    return null!
   }
 
   serialize(t: T) {
@@ -60,8 +60,13 @@ export function object<T extends object>(specs: ObjectSerializerProps<T>, inst?:
   return new ObjectSerializer<T>(specs, inst)
 }
 
-export function boolean() {
-  return new BooleanSerializer()
+export function boolean(): BooleanSerializer
+export function boolean(def: boolean): Serializer<boolean>
+export function boolean(def?: boolean) {
+  var res = new BooleanSerializer()
+  if (def !== undefined)
+    return res.default(def)
+  return res
 }
 
 
