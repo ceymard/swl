@@ -238,11 +238,11 @@ export const transformers = new FactoryContainer()
 export function register(...mimes: string[]) {
   return function (target: new () => PipelineComponent<any, any>) {
     var proto = Object.getPrototypeOf(target)
-    if (proto instanceof Source) {
+    if (proto === Source || proto instanceof Source) {
       sources.add(mimes, target)
-    } else if (proto instanceof Transformer) {
+    } else if (proto === Transformer || proto instanceof Transformer) {
       transformers.add(mimes, target)
-    } else if (proto instanceof Sink) {
+    } else if (proto === Sink || proto instanceof Sink) {
       sinks.add(mimes, target)
     } else {
       sources.add(mimes, target)

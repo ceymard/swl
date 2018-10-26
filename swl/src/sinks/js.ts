@@ -30,8 +30,9 @@ export class Js extends Transformer<{}, string> {
       for (var r of res)
         await this.send(Chunk.data(chk.collection, r))
     } else if (res[Symbol.asyncIterator]) {
-      for await (var r of res)
-        await this.send(Chunk.data(chk.collection, r))
+
+      // for await (var r of res)
+        // await this.send(Chunk.data(chk.collection, r))
     } else await this.send(Chunk.data(chk.collection, res))
   }
 
