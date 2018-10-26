@@ -79,11 +79,18 @@ export class ChunkStream {
 
     this.stack_size++
 
-    if (chunk === null) this.finished = true
+    if (chunk === null) {
+      this.finished = true
+    }
+
+    if (this.stack_size >= MAX_STACK_SIZE || chunk === null) {
+      this.fetch_lock.resolve()
+    }
 
     if (this.stack_size >= MAX_STACK_SIZE) {
       return this.send_lock.promise
     }
+
   }
 
   next() {
@@ -99,7 +106,10 @@ export class ChunkStream {
     var chunk = start.chunk
     this.start = start.next
 
-    if (!this.start) this.end = null
+    if (!this.start) {
+      this.end = null
+      this.send_lock.resolve()
+    }
 
     return chunk
   }
@@ -184,7 +194,6 @@ export class FactoryContainer {
       parsed = await (Promise.all(parsed))
     }
 
-    await handler.init()
     return handler
   }
 }

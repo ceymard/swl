@@ -52,7 +52,7 @@ export class ObjectSerializer<T extends object> extends Serializer<T> {
 export class BooleanSerializer extends Serializer<boolean> {
 
   deserialize(t: unknown) {
-    return !!t
+    return !!t || !!this._default
   }
 
   serialize(t: boolean) {
