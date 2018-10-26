@@ -3,6 +3,7 @@
 export class Serializer<T> {
 
   protected _default: T | undefined = undefined
+  public _help: string
 
   serialize(arg: T): unknown {
     return null
@@ -15,6 +16,11 @@ export class Serializer<T> {
   default(def: T) {
     this._default = def
     return this as any as Serializer<NonNullable<T>>
+  }
+
+  help(tpl: TemplateStringsArray) {
+    this._help = tpl[0]
+    return this
   }
 
 }
@@ -53,6 +59,26 @@ export class BooleanSerializer extends Serializer<boolean> {
     return !!t
   }
 
+}
+
+export class StringSerializer extends Serializer<string> {
+  deserialize(t: unknown) {
+    // FIXME check that t is indeed a string.
+    return t as string
+  }
+
+  serialize(t: string) {
+    return t
+  }
+}
+
+export function string(): Serializer<string>
+export function string(def: string): Serializer<string>
+export function string(def?: string): Serializer<string> {
+  var res = new StringSerializer()
+  if (def !== undefined)
+    return res.default(def)
+  return res
 }
 
 

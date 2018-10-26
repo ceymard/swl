@@ -1,5 +1,5 @@
 
-import {Sequence, OPT_OBJECT, URI, s, ChunkIterator, Chunk, Source, register, ParserType, Sink } from 'swl'
+import {Sequence, OPT_OBJECT, URI, s, Chunk, Source, register, ParserType, Sink } from 'swl'
 import * as S from 'better-sqlite3'
 
 
@@ -84,7 +84,7 @@ export class SqliteSource extends Source<
     this.db.close()
   }
 
-  async* emit(): ChunkIterator {
+  async emit() {
     var sources = this.sources
     var keys = Object.keys(sources||{})
 
@@ -104,12 +104,8 @@ export class SqliteSource extends Source<
 
       var stmt = this.db.prepare(sql)
 
-      yield Chunk.info(this, `Started ${colname}`)
+      await this.send(Chunk.info(this, `Started ${colname}`))
       var iterator = (stmt as any).iterate() as IterableIterator<any>
-      var start = iterator.next()
-      if (!start.done) {
-        yield Chunk.start(colname, start.value)
-      }
       for (var s of iterator) {
         if (this.uncoerce) {
           var s2: any = {}
@@ -117,10 +113,10 @@ export class SqliteSource extends Source<
             s2[x] = uncoerce(s[x])
           s = s2
         }
-        yield Chunk.data(colname, s)
+        await this.send(Chunk.data(colname, s))
       }
     }
-    yield Chunk.info(this, 'done')
+    await this.send(Chunk.info(this, 'done'))
 
   }
 
@@ -191,11 +187,11 @@ export class SqliteSink extends Sink<
   /**
    * Create the table, truncate it or drop it if necessary
    */
-  async *onCollectionStart(start: Chunk.Start): ChunkIterator {
+  async onCollectionStart(start: Chunk.Data) {
 
     var sql = ''
-    var table = start.name
-    var payload = start.first_payload
+    var table = start.collection
+    var payload = start.payload
     var columns = Object.keys(payload)
     this.columns = columns
 
@@ -205,7 +201,7 @@ export class SqliteSink extends Sink<
 
     if (this.options.drop) {
       sql = `DROP TABLE IF EXISTS "${table}"`
-      yield Chunk.info(this, sql)
+      this.send(Chunk.info(this, sql))
       this.db.exec(sql)
     }
 
@@ -214,7 +210,7 @@ export class SqliteSink extends Sink<
     sql = `CREATE TABLE IF NOT EXISTS "${table}" (
         ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
       )`
-    yield Chunk.info(this, sql)
+    this.send(Chunk.info(this, sql))
     this.db.exec(sql)
 
     if (this.mode === 'insert') {
@@ -233,12 +229,12 @@ export class SqliteSink extends Sink<
 
     if (this.options.truncate) {
       sql = `DELETE FROM "${table}"`
-      yield Chunk.info(this, sql)
+      this.send(Chunk.info(this, sql))
       this.db.exec(sql)
     }
   }
 
-  async *onData(data: Chunk.Data): ChunkIterator {
+  async onData(data: Chunk.Data) {
     this.stmt.run(...this.columns.map(c => coerce(data.payload[c])))
   }
 }

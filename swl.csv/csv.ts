@@ -1,59 +1,73 @@
-import { URI_WITH_OPTS, make_write_creator, make_read_creator, sources, y, ChunkIterator, Chunk, StreamWrapper, register} from 'swl'
+import { URI_WITH_OPTS, make_write_creator, make_read_creator, Chunk, StreamWrapper, register, Source, s, ParserType, Sink } from 'swl'
 
 import * as stringify from 'csv-stringify'
+
 const parse = require('csv-parser')
 
-sources.add(
-`Read csv files`,
-  y.object({
-    columns: y.boolean().default(true),
-    separator: y.string().default(';'),
-    auto_parse: y.boolean().default(true)
-  }),
-  URI_WITH_OPTS,
-  async function csv(opts, [uri, source_options]) {
+const CSV_SOURCE_OPTIONS = s.object({
+  columns: s.boolean(true),
+  separator: s.string(';'),
+  auto_parse: s.boolean(true)
+})
+
+@register('csv', '.csv')
+export class CsvSource extends Source<
+  s.BaseType<typeof CSV_SOURCE_OPTIONS>,
+  ParserType<typeof URI_WITH_OPTS>
+> {
+  help = `Read csv files`
+  options_parser = CSV_SOURCE_OPTIONS
+  body_parser = URI_WITH_OPTS
+
+  async init() {
+    var source_options = this.body[1]
     source_options.encoding = source_options.encoding || 'utf-8'
-    const sources = await make_read_creator(uri, source_options || {})
+  }
 
-    return async function *csv(upstream: ChunkIterator): ChunkIterator {
-      yield* upstream
+  async emit() {
+    const sources = await make_read_creator(await this.body[0], this.body[1] || {})
 
-      for await (var src of sources) {
-        yield Chunk.start(src.collection)
-        const stream = new StreamWrapper(src.source.pipe(parse(opts)))
-        var value
-        while ( (value = await stream.read()) !== null ) {
-          yield Chunk.data(value)
-        }
+    for await (var src of sources) {
+      const stream = new StreamWrapper(src.source.pipe(parse(this.options)))
+      var value: any
+      while ( (value = await stream.read()) !== null ) {
+        await this.send(Chunk.data(src.collection, value))
       }
     }
-}, 'csv', '.csv')
+
+  }
+
+}
 
 
-sinks.add(
-`Output to csv`,
-  y.object({
-    encoding: y.string().default('utf-8'),
-    header: y.boolean().default(true),
-    delimiter: y.string().default(';')
-  }),
-  URI_WITH_OPTS,
-  async function csv(opts, [uri, options]) {
+@register('csv', '.csv')
+export class CsvSink extends Sink<
+  s.BaseType<typeof CSV_SOURCE_OPTIONS>,
+  ParserType<typeof URI_WITH_OPTS>
+> {
 
-    return async function *csv(upstream: ChunkIterator): ChunkIterator {
-      var w = await make_write_creator(uri, Object.assign({}, options, opts))
-      var file: StreamWrapper<NodeJS.WritableStream>
+  help = `Output to csv`
+  options_parser = CSV_SOURCE_OPTIONS
+  body_parser = URI_WITH_OPTS
 
-      for await (var chk of upstream) {
-        if (chk.type === 'start') {
-          var end = await w(chk.name)
-          var st = stringify(opts)
-          st.pipe(end.stream)
-          file = new StreamWrapper(st)
-        } else if (chk.type === 'data') {
-          await file!.write(chk.payload)
-        } else yield chk
-      }
-    }
-  }, 'csv', '.csv'
-)
+  file!: StreamWrapper<NodeJS.WritableStream>
+
+  async init() {
+  }
+
+  async onCollectionStart(chk: Chunk.Data) {
+    var w = await make_write_creator(await this.body[0], Object.assign({}, this.options, this.body[1]))
+    var str = await w(chk.collection)
+    var st = stringify(this.body[1])
+    st.pipe(str.stream)
+    this.file = new StreamWrapper(st)
+  }
+
+  async onCollectionEnd() {
+    this.file.close()
+  }
+
+  async onData(chk: Chunk.Data) {
+    await this.file.write(chk.payload)
+  }
+}
