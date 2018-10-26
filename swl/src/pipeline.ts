@@ -278,7 +278,7 @@ export interface OptionsParser<T> {
 }
 
 
-export const MAX_STACK_SIZE = 10
+export const MAX_STACK_SIZE = 1024
 
 
 export abstract class PipelineComponent<O, B> {
