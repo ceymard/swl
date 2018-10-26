@@ -74,7 +74,7 @@ async function run() {
   const pipeline = instantiate_pipeline(pipe)
   do {
     var res = await pipeline.next()
-  } while (!res.done)
+  } while (res)
 }
 
 run().catch(e => console.error(e.stack))

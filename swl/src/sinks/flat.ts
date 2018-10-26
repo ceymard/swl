@@ -1,4 +1,4 @@
-import { ChunkIterator, Transformer, Chunk, register } from '../pipeline'
+import { Transformer, Chunk, register } from '../pipeline'
 import { flatten as f, unflatten as u } from 'flat'
 
 
@@ -11,8 +11,8 @@ export class Flatten extends Transformer<{}, []> {
 
   // FIXME we should make a suitable options_parser for Flatten
 
-  async *onData(chunk: Chunk.Data): ChunkIterator {
-    yield Chunk.data(f(chunk.payload, this.options))
+  async onData(chunk: Chunk.Data) {
+    await this.send(Chunk.data(chunk.collection, f(chunk.payload, this.options)))
   }
 }
 
@@ -25,7 +25,7 @@ export class UnFlatten extends Transformer<{}, []> {
 
   // FIXME we should make a suitable options_parser for Flatten
 
-  async *onData(chunk: Chunk.Data): ChunkIterator {
-    yield Chunk.data(u(chunk.payload, this.options))
+  async onData(chunk: Chunk.Data) {
+    await this.send(Chunk.data(chunk.collection, u(chunk.payload, this.options)))
   }
 }

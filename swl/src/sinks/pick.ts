@@ -1,4 +1,4 @@
-import { ChunkIterator, Sink, Chunk, register } from '../pipeline'
+import { Sink, Chunk, register } from '../pipeline'
 import { ARRAY_CONTENTS } from 'clion'
 
 
@@ -20,7 +20,7 @@ export class Pick extends Sink<{}, any[]> {
     }
   }
 
-  async *onData(chunk: Chunk.Data): ChunkIterator {
+  async onData(chunk: Chunk.Data) {
 
     var p = chunk.payload
     var result: any = {}
@@ -36,7 +36,7 @@ export class Pick extends Sink<{}, any[]> {
       }
     }
 
-    yield Chunk.data(result)
+    this.send(Chunk.data(chunk.collection, result))
 
   }
 }

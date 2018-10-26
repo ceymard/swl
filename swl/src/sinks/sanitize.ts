@@ -1,4 +1,4 @@
-import { ChunkIterator, Transformer, register, Chunk } from '../pipeline'
+import { Transformer, register, Chunk } from '../pipeline'
 import * as s from '../slz'
 
 
@@ -33,14 +33,14 @@ export class Sanitize extends Transformer<s.BaseType<typeof SANITIZE_OPTIONS>, s
   body_parser = null
   column_cache = {} as  {[s: string]: string}
 
-  async *onData(chunk: Chunk.Data): ChunkIterator {
+  async onData(chunk: Chunk.Data) {
     var ocolname = this.options.collections
     var ocolumns = this.options.columns
     var ovalues = this.options.values
     var column_cache = this.column_cache
 
     if (!this.options.columns && !this.options.values) {
-      yield chunk
+      await this.send(chunk)
       return
     }
 
@@ -49,7 +49,7 @@ export class Sanitize extends Transformer<s.BaseType<typeof SANITIZE_OPTIONS>, s
     for (var x in p) {
       n[ocolumns ? (column_cache[x] = column_cache[x] || san(x)) : x] = ovalues && typeof p[x] === 'string' ? san(p[x]) : p[x]
     }
-    yield Chunk.data(ocolname ? san(chunk.collection) : chunk.collection, n)
+    await this.send(Chunk.data(ocolname ? san(chunk.collection) : chunk.collection, n))
   }
 
 }

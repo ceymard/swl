@@ -14,7 +14,7 @@ export async function make_write_creator(uri: string, options: any) {
 
 import * as path from 'path'
 
-export async function *make_read_creator(uri: string, options: any) {
+export function *make_read_creator(uri: string, options: any) {
   // Check for protocol !!
   yield {
     collection: path.basename(uri).replace(/\.[^\.]+$/, ''),

@@ -1,5 +1,5 @@
 
-import { ChunkIterator, Transformer, register, Sink, Chunk } from '../pipeline'
+import { Transformer, register, Sink, Chunk } from '../pipeline'
 import * as s from '../slz'
 
 import ch from 'chalk'
@@ -62,13 +62,12 @@ export class DebugTransformer extends Transformer<{data: boolean, other: boolean
   current_collection: string = ''
   nb = 0
 
-  async *onCollectionStart(chunk: Chunk.Start): ChunkIterator {
-    this.current_collection = chunk.name
+  async onCollectionStart(chunk: Chunk.Data) {
+    this.current_collection = chunk.collection
     this.nb = 0
-    yield chunk
   }
 
-  async *onData(chunk: Chunk.Data): ChunkIterator {
+  async onData(chunk: Chunk.Data) {
 
     if (this.options.data) {
       this.nb++
@@ -77,12 +76,12 @@ export class DebugTransformer extends Transformer<{data: boolean, other: boolean
       process.stdout.write('\n')
     }
 
-    yield chunk
+    await this.send(chunk)
   }
 
-  async *onInfo(chunk: Chunk.Info): ChunkIterator {
+  async onInfo(chunk: Chunk.Info) {
     process.stdout.write(info(`${chunk.source}: `) + chunk.message + '\n')
-    yield chunk
+    await this.send(chunk)
   }
 }
 

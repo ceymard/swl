@@ -48,6 +48,63 @@ export namespace Chunk {
 export type Chunk = Chunk.Data | Chunk.Exec | Chunk.Info
 
 
+
+interface LLChunk {
+  chunk: Chunk | null
+  next: LLChunk | null
+}
+
+
+export class ChunkStream {
+  start: LLChunk | null = null
+  end: LLChunk | null = null
+  stack_size = 0
+
+  finished = false
+  send_lock = new Lock
+  fetch_lock = new Lock
+
+  send(chunk: Chunk | null) {
+    if (this.finished) throw new Error(`Finished stream can't be written unto`)
+
+    var ll = {chunk, next: null}
+
+    if (this.stack_size === 0) {
+      this.start = ll
+      this.end = ll
+    } else {
+      this.end!.next = ll
+      this.end = ll
+    }
+
+    this.stack_size++
+
+    if (chunk === null) this.finished = true
+
+    if (this.stack_size >= MAX_STACK_SIZE) {
+      return this.send_lock.promise
+    }
+  }
+
+  next() {
+    var start = this.start
+    if (!start) {
+      if (this.finished)
+        return null
+      return this.fetch_lock.promise
+    }
+
+    this.stack_size--
+
+    var chunk = start.chunk
+    this.start = start.next
+
+    if (!this.start) this.end = null
+
+    return chunk
+  }
+}
+
 /**
  * Conditional pipeline. If the condition is met, then the value travels down
  * another subpipeline
@@ -175,25 +232,46 @@ export const sources = new FactoryContainer()
 export const sinks = new FactoryContainer()
 export const transformers = new FactoryContainer()
 
+/**
+ * Register a component class
+ */
+export function register(...mimes: string[]) {
+  return function (target: new () => PipelineComponent<any, any>) {
+    var proto = Object.getPrototypeOf(target)
+    if (proto instanceof Source) {
+      sources.add(mimes, target)
+    } else if (proto instanceof Transformer) {
+      transformers.add(mimes, target)
+    } else if (proto instanceof Sink) {
+      sinks.add(mimes, target)
+    } else {
+      sources.add(mimes, target)
+      sinks.add(mimes, target)
+    }
+  }
+}
+
 
 /**
  * Connect all the pipeline by sending their generators to the
  * next component as upstream()
  * @param components The pipeline of components to connect.
  */
-export function instantiate_pipeline(components: PipelineComponent<any, any>[], initial?: PipelineComponent<any, any>) {
+export function instantiate_pipeline(components: PipelineComponent<any, any>[], initial?: ChunkStream) {
 
-  async function *start_generator(): ChunkIterator {
-    return
+  if (!initial) {
+    initial = new ChunkStream()
+    initial.send(null)
   }
+
   // Connect the handlers between themselves
-  // console.log('toto ?', handlers[0].name)
-  var comp = components[0].handleWrap(initial ? initial : start_generator())
-  for (var c of components.slice(1)) {
-    comp = c.handleWrap(comp)
+  var stream = initial
+  for (var c of components) {
+    c.runComponent(stream)
+    stream = c.stream
   }
 
-  return comp
+  return stream
 }
 
 
@@ -219,26 +297,6 @@ export async function build_pipeline(fragments: Fragment[]) {
 }
 
 
-/**
- * Register a component class
- */
-export function register(...mimes: string[]) {
-  return function (target: new () => PipelineComponent<any, any>) {
-    var proto = Object.getPrototypeOf(target)
-    if (proto instanceof Source) {
-      sources.add(mimes, target)
-    } else if (proto instanceof Transformer) {
-      transformers.add(mimes, target)
-    } else if (proto instanceof Sink) {
-      sinks.add(mimes, target)
-    } else {
-      sources.add(mimes, target)
-      sinks.add(mimes, target)
-    }
-  }
-}
-
-
 export interface OptionsParser<T> {
   deserialize(unk: unknown): T
 }
@@ -254,7 +312,9 @@ export abstract class PipelineComponent<O, B> {
   options!: O
   abstract body_parser: Parser<B> | null
   body!: B
-  upstream!: PipelineComponent<any, any>
+
+  upstream!: ChunkStream
+  stream = new ChunkStream()
 
   send_lock: Lock | null = null
   fetch_lock: Lock | null = null
@@ -267,14 +327,8 @@ export abstract class PipelineComponent<O, B> {
    * @returns null if the sending went well or a Lock if its stack_size
    *  reached size limit.
    */
-  send(chk: Chunk | null): null | Lock {
-    return null
-  }
-
-  fetch(): Chunk | Lock | null {
-    if (this.stack_size === 0)
-      return new Lock()
-    return null
+  send(chk: Chunk | null) {
+    return this.stream.send(chk)
   }
 
   async init() {
@@ -293,7 +347,8 @@ export abstract class PipelineComponent<O, B> {
 
   }
 
-  async handleWrap() {
+  async runComponent(upstream: ChunkStream) {
+    this.upstream = upstream
     try {
       await this.init()
       await this.process()
@@ -312,6 +367,18 @@ export abstract class PipelineComponent<O, B> {
 
   }
 
+  async forward(stream: ChunkStream) {
+    var next: Chunk | Promise<any> | null
+    while (next = this.upstream.next()) {
+
+      if (next instanceof Promise) {
+        await next
+        continue
+      }
+
+      this.send(next)
+    }
+  }
 }
 
 
@@ -319,14 +386,9 @@ export abstract class Source<O, B> extends PipelineComponent<O, B> {
 
   async process() {
     // The source simply forwards everything from upstream
-    var next: Chunk | null | Lock
-    while (next = await this.upstream.fetch()) {
-      if (next instanceof Lock)
-        await next.promise
-      else
-        this.send(next)
-    }
+    await this.forward(this.upstream)
     await this.emit()
+    this.send(null)
   }
 
   /**
@@ -344,11 +406,11 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
   async process() {
     var current_collection: string | null = null
 
-    var chk: Chunk | null | Lock
-    while (chk = this.upstream.fetch()) {
+    var chk: Chunk | Promise<any> | null
+    while (chk = this.upstream.next()) {
 
-      if (chk instanceof Lock) {
-        await chk.promise
+      if (chk instanceof Promise) {
+        await chk
         continue
       }
 
@@ -367,6 +429,12 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
         await (this as any)[method](chk.options, chk.body)
       }
     }
+
+    if (current_collection)
+      await this.onCollectionEnd(current_collection)
+
+    // We're done, so we're sending null !
+    this.send(null)
   }
 
   async onCollectionStart(chunk: Chunk.Data) {
@@ -377,12 +445,12 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
 
   }
 
-  async *onData(chunk: Chunk.Data): ChunkIterator {
-    yield chunk
+  async onData(chunk: Chunk.Data) {
+    this.send(chunk)
   }
 
-  async *onInfo(chunk: Chunk.Info): ChunkIterator {
-    yield chunk
+  async onInfo(chunk: Chunk.Info) {
+    this.send(chunk)
   }
 
 }

@@ -1,5 +1,5 @@
 
-import { register, Transformer, ChunkIterator, Chunk } from '../pipeline'
+import { register, Transformer, Chunk } from '../pipeline'
 import * as R from 'ramda'
 
 
@@ -19,21 +19,20 @@ export class Js extends Transformer<{}, string> {
     this.fn = eval(this.body)
   }
 
-  async *onCollectionStart(chk: Chunk.Start): ChunkIterator {
-    this.current_collection
+  async onCollectionStart(chk: Chunk.Data) {
+    this.current_collection = chk.collection
     this.nb = 0
-    yield chk
   }
 
-  async *onData(chk: Chunk.Data): ChunkIterator {
+  async onData(chk: Chunk.Data) {
     var res = this.fn(chk.payload, this.current_collection, this.nb++) as any
     if (res[Symbol.iterator]) {
       for (var r of res)
-        yield Chunk.data(r)
+        await this.send(Chunk.data(chk.collection, r))
     } else if (res[Symbol.asyncIterator]) {
       for await (var r of res)
-        yield Chunk.data(r)
-    } else yield Chunk.data(res)
+        await this.send(Chunk.data(chk.collection, r))
+    } else await this.send(Chunk.data(chk.collection, res))
   }
 
 }

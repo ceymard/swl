@@ -1,5 +1,5 @@
 
-import { build_pipeline, PipelineComponent, ChunkIterator, instantiate_pipeline } from '../pipeline'
+import { build_pipeline, PipelineComponent, instantiate_pipeline } from '../pipeline'
 import { ARRAY_CONTENTS } from 'clion'
 import { URI, FRAGMENTS } from '../cmdparse'
 import { ParserType } from '../types'
@@ -49,9 +49,9 @@ export class Swl extends PipelineComponent<{}, ParserType<typeof SWL_PARSER>> {
     this.pipeline = await build_swl_file_pipeline(file, argv, this.options)
   }
 
-  async *handle(upstream: ChunkIterator): ChunkIterator {
-    var pipe = instantiate_pipeline(this.pipeline, upstream)
-    yield* pipe
+  async process() {
+    var stream = instantiate_pipeline(this.pipeline, this.upstream)
+    await this.forward(stream)
   }
 
 }
