@@ -1,14 +1,15 @@
 import * as XLSX from 'xlsx'
 import {
-  sources,
-  ChunkIterator,
   Chunk,
   Sequence,
   make_read_creator,
-  y,
-  sinks,
+  s,
   URI,
-  OPT_OBJECT
+  OPT_OBJECT,
+  ParserType,
+  Source,
+  register,
+  Sink
 } from 'swl'
 
 
@@ -45,138 +46,136 @@ for (let i = 0; i < _l.length; i++) {
 }
 
 
+const XLS_OPTIONS = s.object({
+  header: s.string()
+})
+const XLS_SOURCE_BODY = Sequence(URI, OPT_OBJECT)
 
-sources.add(
-`Read collections from a notebook`,
-  y.object({
-    header: y.string()
-  }),
-  Sequence(URI, OPT_OBJECT),
-  async function xlsx(opts, [file, sources]) {
+@register('xls', '.xls', '.xlsx', '.xlsb', '.xlsm', '.ods')
+export class XlsSource extends Source<
+  s.BaseType<typeof XLS_OPTIONS>,
+  ParserType<typeof XLS_SOURCE_BODY>
+> {
+  help = `Read collections from a notebook`
+  body_parser = XLS_SOURCE_BODY
+  options_parser = XLS_OPTIONS
 
-    const files = await make_read_creator(file, {})
+  async emit() {
+    const files = await make_read_creator(await this.body[0], {})
 
-    return async function *inline_json(upstream: ChunkIterator): ChunkIterator {
-      yield* upstream
+    for (var file of files) {
+      const b = await get_stream(file.source)
+      const w = XLSX.read(b, {cellHTML: false, cellText: false})
+      await this.handleWorkbook(w)
+    }
+  }
 
-      for await (const file of files) {
-        const b = await get_stream(file.source)
-        const w = XLSX.read(b, {cellHTML: false, cellText: false})
-        // console.log(wp)
+  async handleWorkbook(w: XLSX.WorkBook) {
+    for (var sname of w.SheetNames) {
+      const s = w.Sheets[sname]
+      const sources = this.body[1]
 
-        for (var sname of w.SheetNames) {
-          yield Chunk.start(sname)
-          const s = w.Sheets[sname]
+      // Find out if this sheet should be part of the extraction
+      if (sources && Object.keys(sources).length > 0 && !sources[sname])
+        // If there was a specification of keys and this sheet name is not
+        // one of it, then just continue to the next collection
+        continue
 
-          // Find out if this sheet should be part of the extraction
-          if (sources && Object.keys(sources).length > 0 && !sources[sname])
-            // If there was a specification of keys and this sheet name is not
-            // one of it, then just continue to the next collection
-            continue
+      const re_range = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/
+      const match = re_range.exec(s['!ref'] as string)
+      if (!match) continue
 
-          const re_range = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/
-          const match = re_range.exec(s['!ref'] as string)
-          if (!match) continue
+      // Try to figure out if we were given a header position globally
+      // or for this specific sheet
+      var header_line = 1
+      var header_column = 0
 
-          // Try to figure out if we were given a header position globally
-          // or for this specific sheet
-          var header_line = 1
-          var header_column = 0
+      const re_header = /^([A-Z]+)(\d+)$/
+      const hd = this.options.header || sources && sources![sname]
+      if (typeof hd === 'string') {
+        var m = re_header.exec(hd)
+        if (m) {
+          header_column = columns.indexOf(m[1])
+          header_line = parseInt(m[2])
+        }
+      }
+      // We have to figure out the number of lines
+      const lines = parseInt(match[4])
 
-          const re_header = /^([A-Z]+)(\d+)$/
-          const hd = opts.header || sources && sources![sname]
-          if (typeof hd === 'string') {
-            var m = re_header.exec(hd)
-            if (m) {
-              header_column = columns.indexOf(m[1])
-              header_line = parseInt(m[2])
-            }
+      // Then we want to find the header row. By default it should be
+      // "A1", or the first non-empty cell we find
+      const header: string[] = []
+      for (var i = header_column; i < columns.length; i++) {
+        const cell = s[`${columns[i]}${header_line}`]
+        if (!cell || !cell.v)
+        break
+        header.push(cell.v)
+      }
+
+      // Now that we've got the header, we just go on with the rest of the lines
+      var not_found_count = 0
+      for (var j = header_line + 1; j <= lines; j++) {
+        var obj: {[name: string]: any} = {}
+        var found = false
+        for (i = header_column; i < header.length; i++) {
+          const cell = s[`${columns[i]}${j}`]
+          if (cell) {
+            obj[header[i - header_column]] = cell.v
+            found = true
+            not_found_count = 0
+          } else {
+            obj[header[i - header_column]] = null
           }
-          // We have to figure out the number of lines
-          const lines = parseInt(match[4])
+        }
 
-          // Then we want to find the header row. By default it should be
-          // "A1", or the first non-empty cell we find
-          const header: string[] = []
-          for (var i = header_column; i < columns.length; i++) {
-            const cell = s[`${columns[i]}${header_line}`]
-            if (!cell || !cell.v)
+        if (found)
+          await this.send(Chunk.data(sname, obj))
+        else {
+          not_found_count++
+          if (not_found_count > 5)
+          // More than five empty rows in a row means we're at the end of the document.
             break
-            header.push(cell.v)
-          }
-
-          // Now that we've got the header, we just go on with the rest of the lines
-          var not_found_count = 0
-          for (var j = header_line + 1; j <= lines; j++) {
-            var obj: {[name: string]: any} = {}
-            var found = false
-            for (i = header_column; i < header.length; i++) {
-              const cell = s[`${columns[i]}${j}`]
-              if (cell) {
-                obj[header[i - header_column]] = cell.v
-                found = true
-                not_found_count = 0
-              } else {
-                obj[header[i - header_column]] = null
-              }
-            }
-
-            if (found)
-              yield Chunk.data(obj)
-            else {
-              not_found_count++
-              if (not_found_count > 5)
-              // More than five empty rows in a row means we're at the end of the document.
-                break
-            }
-          }
         }
-        // console.log(b.length)
       }
-
     }
-  }, 'xlsx', '.xlsx', '.xlsb', '.xlsm', '.ods'
-)
+  }
+}
 
-sinks.add(
-`Write collections to a workbook`,
-  y.object({
-    compression: y.boolean().default(true)
-  }),
-  URI,
-  function xlsx(opts, uri) {
 
-    return async function *handle(upstream: ChunkIterator): ChunkIterator {
-      const wb = XLSX.utils.book_new()
-      var name: string | null = null
-      var acc: any[] = []
+const XLS_WRITE_OPTIONS = s.object({
+  compression: s.boolean(false)
+})
 
-      function write_sheet() {
-        if (name !== null) {
-          XLSX.utils.book_append_sheet(
-            wb,
-            XLSX.utils.json_to_sheet(acc),
-            name
-          )
-        }
-      }
+export class XlsSink extends Sink<
+  s.BaseType<typeof XLS_WRITE_OPTIONS>,
+  ParserType<typeof URI>
+> {
+  help = `Write collections to a workbook`
+  options_parser = XLS_WRITE_OPTIONS
+  body_parser = URI
 
-      for await (var ch of upstream) {
-        if (ch.type === 'start') {
-          write_sheet()
-          name = ch.name
-          acc = []
+  wb!: XLSX.WorkBook
+  acc = [] as any[]
 
-        } else if (ch.type === 'data') {
-          acc.push(ch.payload)
-        }
-      }
+  async init() {
+    this.wb = XLSX.utils.book_new()
+  }
 
-      write_sheet()
-      if (name !== null)
-        XLSX.writeFile(wb, uri, {compression: opts.compression})
-    }
+  async onCollectionEnd(name: string) {
+    XLSX.utils.book_append_sheet(
+      this.wb,
+      XLSX.utils.json_to_sheet(this.acc),
+      name
+    )
 
-  },
-  'xlsx', '.xlsx', '.xlsm', '.xlsb', '.ods'
-)
+    this.acc = []
+  }
+
+  async onData(chunk: Chunk.Data) {
+    this.acc.push(chunk.payload)
+  }
+
+  async end() {
+    XLSX.writeFile(this.wb, await this.body)
+  }
+}

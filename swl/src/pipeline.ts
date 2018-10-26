@@ -394,9 +394,7 @@ export abstract class Source<O, B> extends PipelineComponent<O, B> {
   /**
    * This function must be redefined
    */
-  async emit() {
-
-  }
+  abstract async emit(): Promise<void>
 
 }
 
@@ -434,7 +432,8 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
       await this.onCollectionEnd(current_collection)
 
     // We're done, so we're sending null !
-    this.send(null)
+    await this.send(null)
+    await this.end()
   }
 
   async onCollectionStart(chunk: Chunk.Data) {

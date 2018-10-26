@@ -1,31 +1,27 @@
 
-import {sources, ChunkIterator, Chunk, StreamWrapper, URI_WITH_OPTS, make_read_creator, sinks, make_write_creator} from 'swl'
-import * as y from 'yup'
+import {Chunk, Source, register} from 'swl'
 
 
-sources.add(
-`Inline json`,
-  y.object({}),
-  null,
-  function inline(opts, rest) {
+@register('inline')
+export class InlineJson extends Source<
+  {}, string
+> {
+  help = `Inline Json`
+  options_parser = null
+  body_parser = null
 
-    rest = rest.trim()
+  async emit() {
+    var rest = this.body.trim()
     if (rest[0] !== '[')
       rest = `[${rest}]`
-
-    const collection = eval(rest)
-
-    return async function *inline_json(upstream: ChunkIterator): ChunkIterator {
-      yield* upstream
-      for (var c of collection) {
-        yield Chunk.data(c)
-      }
+    for (var c of eval(rest)) {
+      await this.send(Chunk.data('json', c))
     }
-  },
-  'inline'
-)
+  }
+}
 
 
+/*
 sources.add(
 `Read json files`,
   y.object({}),
@@ -116,3 +112,4 @@ sinks.add(
   },
   'json', '.json'
 )
+*/
