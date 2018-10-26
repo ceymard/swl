@@ -131,6 +131,7 @@ export const SQLITE_SINK_OPTIONS = s.object({
 
 export const SQLITE_SINK_BODY = URI
 
+@register('sqlite', '.db', '.sqlite', '.sqlite3')
 export class SqliteSink extends Sink<
   s.BaseType<typeof SQLITE_SINK_OPTIONS>,
   ParserType<typeof URI>

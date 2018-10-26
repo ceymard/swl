@@ -404,7 +404,6 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
 
     // We're done, so we're sending null !
     await this.send(null)
-    await this.end()
   }
 
   async onCollectionStart(chunk: Chunk.Data) {
