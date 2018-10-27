@@ -1,8 +1,8 @@
 {
   "name": "swl.mssql",
   "version": "0.0.1",
-  "main": "pg.js",
-  "types": "pg.d.ts",
+  "main": "mssql.js",
+  "types": "mssql.d.ts",
   "scripts": {
     "watch": "wtsc -w",
     "build": "wtsc"

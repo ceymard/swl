@@ -327,6 +327,7 @@ export abstract class PipelineComponent<O, B> {
       await this.end()
     } catch (e) {
       await this.error(e)
+      throw e
     } finally {
       await this.final()
     }

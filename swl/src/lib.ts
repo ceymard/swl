@@ -23,5 +23,6 @@ try_require(
   'swl.imap',
   'swl.mysql',
   'swl.oracle',
-  'swl.xlsx'
+  'swl.xlsx',
+  'swl.mssql'
 )
