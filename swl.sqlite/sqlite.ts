@@ -274,9 +274,9 @@ export function coerce(value: any) {
   if (value === undefined)
     return null
 
-  if (value instanceof Date)
-    return value.toUTCString()
-  if (Array.isArray(value))
+  if (value instanceof Date) {
+    return value.toISOString()
+  } if (Array.isArray(value))
     return value.join(', ')
 
   return JSON.stringify(value)

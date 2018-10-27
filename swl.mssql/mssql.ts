@@ -41,6 +41,7 @@ export class MssqlSource extends Source<
     var keys = Object.keys(sources)
     if (keys.length === 0) {
       // Get the list of all the tables if we did not know them.
+      await this.send(Chunk.info(this, 'Getting table list'))
       const tables = (await db.request().query(`
         SELECT table_name FROM information_schema.tables
         WHERE table_type = 'BASE TABLE' and table_name not like 'sys%'`)).recordset
@@ -54,6 +55,7 @@ export class MssqlSource extends Source<
 
     for (var colname of keys) {
       var val = sources[colname]
+      await this.send(Chunk.info(this, `Processing ${colname}`))
 
       var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
       : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`

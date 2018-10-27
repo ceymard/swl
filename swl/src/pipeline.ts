@@ -278,7 +278,7 @@ export interface OptionsParser<T> {
 }
 
 
-export const MAX_STACK_SIZE = 1024
+export const MAX_STACK_SIZE = 8192
 
 
 export abstract class PipelineComponent<O, B> {
@@ -405,11 +405,11 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
   }
 
   async onData(chunk: Chunk.Data) {
-    this.send(chunk)
+    await this.send(chunk)
   }
 
   async onInfo(chunk: Chunk.Info) {
-    this.send(chunk)
+    await this.send(chunk)
   }
 
 }

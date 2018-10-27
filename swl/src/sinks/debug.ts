@@ -97,8 +97,8 @@ export class NullSink extends Sink {
 
   }
 
-  async onInfo() {
-
+  async onInfo(chk: Chunk.Info) {
+    // await this.send(chk)
   }
 
   async onExec() {
