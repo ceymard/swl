@@ -146,6 +146,7 @@ const XLS_WRITE_OPTIONS = s.object({
   compression: s.boolean(false)
 })
 
+@register('xls', '.xls', '.xlsx', '.xlsb', '.xlsm', '.ods')
 export class XlsSink extends Sink<
   s.BaseType<typeof XLS_WRITE_OPTIONS>,
   ParserType<typeof URI>
