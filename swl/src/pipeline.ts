@@ -64,7 +64,7 @@ export class ChunkStream {
   send_lock = new Lock
   fetch_lock = new Lock
 
-  send(chunk: Chunk | null) {
+  async send(chunk: Chunk | null) {
     if (this.finished) throw new Error(`Finished stream can't be written unto`)
 
     var ll = {chunk, next: null}
@@ -90,19 +90,19 @@ export class ChunkStream {
     }
 
     if (this.stack_size >= MAX_STACK_SIZE) {
-      return this.send_lock.promise
+      await this.send_lock.promise
     }
 
   }
 
-  next() {
-    var start = this.start
-    if (!start) {
+  async next() {
+    while (!this.start) {
       if (this.finished)
         return null
 
-      return this.fetch_lock.promise
+      await this.fetch_lock.promise
     }
+    var start = this.start
 
     this.stack_size--
 
@@ -299,8 +299,8 @@ export abstract class PipelineComponent<O, B> {
    * @returns null if the sending went well or a Lock if its stack_size
    *  reached size limit.
    */
-  send(chk: Chunk | null) {
-    return this.stream.send(chk)
+  async send(chk: Chunk | null) {
+    return await this.stream.send(chk)
   }
 
   async init() {
@@ -341,14 +341,8 @@ export abstract class PipelineComponent<O, B> {
 
   async forward(stream: ChunkStream) {
     var next: Chunk | Promise<any> | null
-    while (next = this.upstream.next()) {
-
-      if (next instanceof Promise) {
-        await next
-        continue
-      }
-
-      this.send(next)
+    while (next = await this.upstream.next()) {
+      await this.send(next)
     }
   }
 }
@@ -377,12 +371,7 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
     var current_collection: string | null = null
 
     var chk: Chunk | Promise<any> | null
-    while (chk = this.upstream.next()) {
-      if (chk instanceof Promise) {
-        await chk
-        continue
-      }
-
+    while (chk = await this.upstream.next()) {
       if (chk.type === 'data') {
         if (current_collection !== chk.collection) {
           if (current_collection !== null)

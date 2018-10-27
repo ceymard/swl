@@ -73,9 +73,7 @@ async function run() {
   const pipe = await build_pipeline(fragments)
   const stream = instantiate_pipeline(pipe)
   do {
-    var res = stream.next()
-    if (res instanceof Promise)
-      await res
+    var res = await stream.next()
   } while (res)
 }
 
