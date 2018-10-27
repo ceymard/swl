@@ -1,5 +1,5 @@
 {
-  "name": "swl.postgres",
+  "name": "swl.mssql",
   "version": "0.0.1",
   "main": "pg.js",
   "types": "pg.d.ts",
