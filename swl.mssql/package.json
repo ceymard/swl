@@ -1,0 +1,16 @@
+{
+  "name": "swl.postgres",
+  "version": "0.0.1",
+  "main": "pg.js",
+  "types": "pg.d.ts",
+  "scripts": {
+    "watch": "wtsc -w",
+    "build": "wtsc"
+  },
+  "dependencies": {
+    "mssql": "^4.2.2"
+  },
+  "devDependencies": {
+    "@types/mssql": "^4.0.10"
+  }
+}

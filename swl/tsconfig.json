@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "target": "esnext",
+        "target": "es2017",
         "module": "commonjs",
         "moduleResolution": "node",
         "declaration": true,
@@ -10,7 +10,7 @@
         "noUnusedLocals": true,
         "rootDir": "./src",
         "outDir": "./lib",
-        "lib": ["es6", "esnext"]
+        "lib": ["es2017", "esnext"]
     }
 
 }
