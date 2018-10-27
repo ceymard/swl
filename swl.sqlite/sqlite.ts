@@ -197,7 +197,7 @@ export class SqliteSink extends Sink<
     var columns = Object.keys(payload)
     this.columns = columns
 
-    var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
+    var types = columns.map(c => typeof payload[c] === 'number' ? 'int'
     : payload[c] instanceof Buffer ? 'blob'
     : 'text')
 
