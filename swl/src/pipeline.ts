@@ -326,7 +326,11 @@ export abstract class PipelineComponent<O, B> {
       await this.process()
       await this.end()
     } catch (e) {
-      await this.error(e)
+      try {
+        await this.error(e)
+      } catch (e2) {
+        console.error('error in error()', e2.stack)
+      }
       throw e
     } finally {
       await this.final()

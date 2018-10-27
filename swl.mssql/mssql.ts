@@ -139,8 +139,9 @@ export class PgSink extends Sink<
   }
 
   async error(err: any) {
+    if (this.statement)
+      await this.statement.unprepare()
     await this.transaction.rollback()
-    throw err
   }
 
   async onCollectionStart(chunk: Chunk.Data) {
@@ -194,11 +195,12 @@ export class PgSink extends Sink<
 
   async onData(chunk: Chunk.Data) {
     await this.statement.execute(chunk.payload)
-    // await this.wr!.write(chunk.payload)
   }
 
   async onCollectionEnd(table: string) {
     await this.statement.unprepare()
+    this.statement = null!
+
     // var upsert = ""
     if (this.options.upsert) {
       var res = await this.query`
