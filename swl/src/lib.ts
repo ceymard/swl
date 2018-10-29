@@ -1,5 +1,10 @@
 if (process.env.DEBUG) require('source-map-support').install()
 
+Date.prototype.toString = function toString(this: Date) {
+  // Why oh why does Date have a default toString that is so useless ?
+  return this.toISOString()
+}
+
 export * from './cmdparse'
 export * from './streams'
 export * from './pipeline'

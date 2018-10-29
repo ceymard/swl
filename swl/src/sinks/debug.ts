@@ -5,13 +5,26 @@ import * as s from '../slz'
 import ch from 'chalk'
 
 const c = ch.constructor({level: 3})
-const prop = c.hsl(180, 30, 30)
+const constant = c.hsl(0, 60, 60)
+const info = c.hsl(40, 60, 60)
 const str = c.hsl(80, 60, 60)
 const num = c.hsl(120, 60, 60)
-const constant = c.hsl(0, 60, 60)
-const bool = c.hsl(280, 60, 60)
+const date = c.hsl(140, 60, 60)
+const prop = c.hsl(180, 30, 30)
 const coll = c.hsl(220, 60, 60)
-const info = c.hsl(40, 60, 60)
+const bool = c.hsl(280, 60, 60)
+
+
+
+const fmt = Intl.DateTimeFormat('fr', {
+  hour12: false,
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: 'numeric',
+  second: 'numeric'
+})
 
 export function print_value(out: NodeJS.WritableStream, obj: any, outside = true) {
 
@@ -23,6 +36,8 @@ export function print_value(out: NodeJS.WritableStream, obj: any, outside = true
     out.write(num(obj as any))
   } else if (typeof obj === 'boolean') {
     out.write(bool(obj as any))
+  } else if (obj instanceof Date) {
+    out.write(date(fmt.format(obj)))
   } else if (typeof obj === 'object') {
     if (!outside)
       out.write('{')

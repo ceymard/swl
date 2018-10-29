@@ -81,12 +81,12 @@ const MSSQL_SINK_OPTIONS = s.object({
   truncate: s.boolean(false).help`Truncate tables before loading`,
   notice: s.boolean(true).help`Show notices on console`,
   drop: s.boolean(false).help`Drop tables`,
-  upsert: s.object({}).help`Upsert Column Name`
+  merge: s.object({}).help`Upsert Column Name`
 })
 
 
 @register('mssql', 'ms')
-export class PgSink extends Sink<
+export class MssqlSink extends Sink<
   s.BaseType<typeof MSSQL_SINK_OPTIONS>,
   ParserType<typeof URI>
 > {
@@ -103,6 +103,7 @@ export class PgSink extends Sink<
   table!: string
 
   async init() {
+    // console.log(this.options)
     const db = this.db = new m.ConnectionPool(`mssql://${await this.body}`)
     await db.connect()
     var tra = this.transaction = await db.transaction()
@@ -127,6 +128,7 @@ export class PgSink extends Sink<
         r.push(`@${name}`)
       }
     }
+
     return await request.query(r.join(' '))
   }
 
@@ -139,6 +141,7 @@ export class PgSink extends Sink<
   }
 
   async error(err: any) {
+    // console.log(err.stack)
     if (this.statement)
       await this.statement.unprepare()
     await this.transaction.rollback()
@@ -189,7 +192,7 @@ export class PgSink extends Sink<
       : m.NVarChar
       this.statement.input(c, type)
     }
-    var stmt = `INSERT INTO [${this.table}](${this.columns_str}) VALUES (${this.columns.map(c => `@${c}`).join(', ')})`
+    var stmt = `INSERT INTO [##temp_table](${this.columns_str}) VALUES (${this.columns.map(c => `@${c}`).join(', ')})`
     await this.statement.prepare(stmt)
   }
 
@@ -201,10 +204,11 @@ export class PgSink extends Sink<
     await this.statement.unprepare()
     this.statement = null!
 
+    console.log('gonna merge now')
     // var upsert = ""
-    if (this.options.upsert) {
-      var res = await this.query`
-        SELECT KU.table_name as table, column_name as column
+    if (this.options.merge) {
+      var res: m.IResult<{table: string, column: string}> = await this.query`
+        SELECT KU.table_name as [table], column_name as [column]
         FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS TC
         INNER JOIN
           INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS KU
@@ -213,6 +217,9 @@ export class PgSink extends Sink<
                    KU.table_name = ${this.table}
         ORDER BY KU.TABLE_NAME, KU.ORDINAL_POSITION;`
 
+      if (!res.recordset[0]) {
+        throw new Error(`table [${this.table}] does not have a primary key`)
+      }
       var col = res.recordset[0].column as string
 
       var all_columns = this.columns
@@ -221,23 +228,26 @@ export class PgSink extends Sink<
 
       // We should probably compute what is the primary key of the table instead of assuming
       // the column is called id
-      var res = await this.query(`
-        MERGE INTO [${this.table}] as T
+      var res2 = await this.query(`
+        SET IDENTITY_INSERT [${this.table}] ON;
+
+        MERGE INTO [${this.table}] as TARGET
         USING (
           SELECT * FROM [##temp_table]
-        ) as row
-        ON row.[${col}] = p.[${col}]
+        ) as SOURCE
+        ON (SOURCE.[${col}] = TARGET.[${col}])
         WHEN NOT MATCHED THEN
           INSERT (${all_columns.map(c => `[${c}]`).join(', ')})
-          VALUES (${all_columns.map(c => `row.[${c}]`).join(', ')})
+          VALUES (${all_columns.map(c => `SOURCE.[${c}]`).join(', ')})
         WHEN MATCHED THEN
-          UPDATE SET ${columns.map(c => `[${c}] = row.[${c}]`)}
+          UPDATE SET ${columns.map(c => `TARGET.[${c}] = SOURCE.[${c}]`).join(', ')}
         ;
 
+        SET IDENTITY_INSERT [${this.table}] OFF;
         DROP TABLE ##temp_table;
       `)
 
-      await this.send(Chunk.info(this, res.rowsAffected.join(", ")))
+      await this.send(Chunk.info(this, res2.rowsAffected.join(", ") + ' rows affected for ' + this.table))
     } else {
       await this.query(`
         INSERT INTO [${table}](${this.columns_str})

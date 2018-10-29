@@ -5,7 +5,7 @@ import * as stringify from 'csv-stringify'
 const parse = require('csv-parser')
 
 const CSV_SOURCE_OPTIONS = s.object({
-  columns: s.boolean(true),
+  columns: s.boolean(true).help `The first row are columns`,
   separator: s.string(';'),
   auto_parse: s.boolean(true)
 })
