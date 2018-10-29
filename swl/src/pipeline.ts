@@ -26,26 +26,14 @@ export namespace Chunk {
     readonly body: string
   }
 
-  export interface Info extends ChunkBase {
-    readonly type: 'info'
-    readonly level: number
-    readonly source: string
-    readonly message: string
-    readonly payload: any
-  }
-
   export function data(collection: string, payload: any): Data {
     return {type: 'data', payload, collection}
-  }
-
-  export function info(source: any, message: string, payload?: any): Info {
-    return {type: 'info', source: source.constructor.name, message, payload, level: 10}
   }
 
 }
 
 
-export type Chunk = Chunk.Data | Chunk.Exec | Chunk.Info
+export type Chunk = Chunk.Data | Chunk.Exec
 
 
 
@@ -315,6 +303,15 @@ export abstract class PipelineComponent<O, B> {
 
   }
 
+  info(message: string, payload?: any) {
+    var err = process.stderr
+    err.write(info(`${this.constructor.name}: `) + message)
+    if (payload !== undefined) {
+      print_value(err, payload)
+    }
+    err.write('\n')
+  }
+
   async error(e: any) {
 
   }
@@ -385,8 +382,6 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
           await this.onCollectionStart(chk)
         }
         await this.onData(chk)
-      } else if (chk.type === 'info') {
-        await this.onInfo(chk)
       } else if (chk.type === 'exec') {
         var method = chk.method
         await (this as any)[method](chk.options, chk.body)
@@ -412,10 +407,6 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
     await this.send(chunk)
   }
 
-  async onInfo(chunk: Chunk.Info) {
-    await this.send(chunk)
-  }
-
 }
 
 
@@ -426,3 +417,5 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
 export abstract class Transformer<O = {}, B = []> extends Sink<O, B> {
 
 }
+
+import { info, print_value } from './sinks/debug'

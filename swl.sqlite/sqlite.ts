@@ -104,7 +104,7 @@ export class SqliteSource extends Source<
 
       var stmt = this.db.prepare(sql)
 
-      await this.send(Chunk.info(this, `Started ${colname}`))
+      this.info(`Started ${colname}`)
       var iterator = (stmt as any).iterate() as IterableIterator<any>
       for (var s of iterator) {
         if (this.uncoerce) {
@@ -117,7 +117,7 @@ export class SqliteSource extends Source<
         await this.send(Chunk.data(colname, s))
       }
     }
-    await this.send(Chunk.info(this, 'done'))
+    this.info('done')
 
   }
 
@@ -203,7 +203,7 @@ export class SqliteSink extends Sink<
 
     if (this.options.drop) {
       sql = `DROP TABLE IF EXISTS "${table}"`
-      this.send(Chunk.info(this, sql))
+      this.info(sql)
       this.db.exec(sql)
     }
 
@@ -212,7 +212,7 @@ export class SqliteSink extends Sink<
     sql = `CREATE TABLE IF NOT EXISTS "${table}" (
         ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
       )`
-    this.send(Chunk.info(this, sql))
+    this.info(sql)
     this.db.exec(sql)
 
     if (this.mode === 'insert') {
@@ -231,7 +231,7 @@ export class SqliteSink extends Sink<
 
     if (this.options.truncate) {
       sql = `DELETE FROM "${table}"`
-      this.send(Chunk.info(this, sql))
+      this.info(sql)
       this.db.exec(sql)
     }
   }

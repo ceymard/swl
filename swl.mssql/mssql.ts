@@ -42,7 +42,7 @@ export class MssqlSource extends Source<
     var keys = Object.keys(sources)
     if (keys.length === 0) {
       // Get the list of all the tables if we did not know them.
-      await this.send(Chunk.info(this, 'Getting table list'))
+      this.info('Getting table list')
       const tables = (await db.query(`
         SELECT table_name FROM information_schema.tables
         WHERE table_type = 'BASE TABLE' and table_name not like 'sys%'`)).recordset
@@ -56,7 +56,7 @@ export class MssqlSource extends Source<
 
     for (var colname of keys) {
       var val = sources[colname]
-      await this.send(Chunk.info(this, `Processing ${colname}`))
+      this.info(`Processing ${colname}`)
 
       var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
       : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
@@ -85,6 +85,105 @@ const MSSQL_SINK_OPTIONS = s.object({
 })
 
 
+/**
+ * A Table handler since there is a lot of work to do with MSSQL.
+ */
+export class MssqlTableHandler {
+
+  public primary_key: string = ''
+  public table_has_identity: boolean = false
+  public columns_sans_id = [] as string[]
+  public table_obj!: m.Table
+  public columns_str!: string
+
+  constructor(
+    public sink: MssqlSink,
+    public table_name: string,
+    public columns: string[]
+  ) {
+    this.columns_str = columns.map(c => `[${c}]`).join(', ')
+  }
+
+  async init() {
+    await this.handlePrimaryKey()
+    await this.initTableObj()
+  }
+
+  /**
+   * Get the primary key from the table and figure out if
+   * the table has an identity column
+   */
+  async handlePrimaryKey() {
+    var res: m.IResult<{table: string, column: string}> = await this.sink.query`
+    SELECT KU.table_name as [table], column_name as [column]
+    FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS TC
+    INNER JOIN
+      INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS KU
+            ON TC.CONSTRAINT_TYPE = 'PRIMARY KEY' AND
+               TC.CONSTRAINT_NAME = KU.CONSTRAINT_NAME AND
+               KU.table_name = ${this.table_name}
+    ORDER BY KU.TABLE_NAME, KU.ORDINAL_POSITION;`
+
+    if (!res.recordset[0]) {
+      throw new Error(`table [${this.table_name}] does not have a primary key`)
+    }
+
+    var col = res.recordset[0].column as string
+    this.primary_key = col
+
+    // Get all the columns that we're inserting that are NOT the primary key
+    this.columns_sans_id = this.columns.filter(c => c!== col)
+
+    this.table_has_identity = (await this.sink.query`SELECT name FROM sys.identity_columns
+      WHERE OBJECT_NAME(OBJECT_ID) = ${this.table_name}`).recordset.length > 0
+  }
+
+  async initTableObj() {
+    var res = await this.sink.query(`SELECT top 0 ${this.columns.map(c => `[${c}]`).join(', ')} FROM [${this.table_name}]`)
+    var res_cols = res.recordset.columns
+
+    this.table_obj = new m.Table('#temp_tbl')
+
+    for (var c of this.columns) {
+      var rc = res_cols[c]
+      this.table_obj.columns.add(rc.name, rc, {
+        nullable: (rc as any).nullable
+      })
+    }
+
+    this.table_obj.create = true
+  }
+
+  async row(payload: any) {
+    var c = this.columns
+    var r = new Array(c.length)
+    for (var i = 0; i < c.length; i++) {
+      r[i] = payload[c[i]]
+    }
+    this.table_obj.rows.push(r)
+
+    if (this.table_obj.rows.length > 1024)
+      await this.flush()
+  }
+
+  /**
+   * Flush the rows we already have in the table, and create
+   */
+  async flush() {
+    var r = this.sink.transaction.request()
+    await r.bulk(this.table_obj)
+
+    // Reset the rows, we do not want to use the add() method so a plain array
+    // should be just fine.
+    this.table_obj.rows = [] as unknown as m.rows
+  }
+
+  async end() {
+    await this.sink.query(`DROP TABLE #temp_tbl;`)
+  }
+}
+
+
 @register('mssql', 'ms')
 export class MssqlSink extends Sink<
   s.BaseType<typeof MSSQL_SINK_OPTIONS>,
@@ -96,11 +195,10 @@ export class MssqlSink extends Sink<
 
   db!: m.ConnectionPool
   transaction!: m.Transaction
-  statement!: m.PreparedStatement
-  columns!: string[]
-  columns_str!: string
-  temp!: string
-  table!: string
+  tbl!: MssqlTableHandler
+
+  values: any[][] = []
+  stmt_nb = 0
 
   async init() {
     const db = this.db = new m.ConnectionPool(`mssql://${await this.body}`)
@@ -139,16 +237,15 @@ export class MssqlSink extends Sink<
   }
 
   async error(err: any) {
-    // console.log(err.stack)
-    if (this.statement)
-      await this.statement.unprepare()
     await this.transaction.rollback()
   }
 
   async onCollectionStart(chunk: Chunk.Data) {
     var payload = chunk.payload
-    var table = this.table = chunk.collection
-    const columns = this.columns = Object.keys(payload)
+
+    var table = chunk.collection
+    const columns = Object.keys(payload)
+
     var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
     : payload[c] instanceof Date ? 'datetime'
     : payload[c] instanceof Buffer ? 'binary'
@@ -167,96 +264,60 @@ export class MssqlSink extends Sink<
       )
     `)
 
-    // Create a temporary table that will receive all the data through pg COPY
-    // command
-    await this.query(`
-      CREATE TABLE ##temp_table (
-        ${columns.map((c, i) => `[${c}] ${types[i]}`).join(', ')}
-      )
-    `)
-
-    this.columns_str = columns.map(c => `[${c}]`).join(', ')
-
     if (this.options.truncate) {
       await this.query(`DELETE FROM [${table}]`)
     }
 
-    this.statement = new m.PreparedStatement(this.transaction as any)
-
-    for (var c of this.columns) {
-      var type = typeof payload[c] === 'number' ? m.Real
-      : payload[c] instanceof Date ? m.DateTime
-      : payload[c] instanceof Buffer ? m.Binary
-      : m.NVarChar
-      this.statement.input(c, type)
-    }
-    var stmt = `INSERT INTO [##temp_table](${this.columns_str}) VALUES (${this.columns.map(c => `@${c}`).join(', ')})`
-    await this.statement.prepare(stmt)
+    this.tbl = new MssqlTableHandler(
+      this,
+      chunk.collection,
+      Object.keys(chunk.payload)
+    )
+    await this.tbl.init()
   }
 
   async onData(chunk: Chunk.Data) {
-    await this.statement.execute(chunk.payload)
+    await this.tbl.row(chunk.payload)
   }
 
   async onCollectionEnd(table: string) {
-    await this.statement.unprepare()
-    this.statement = null!
+    var tbl = this.tbl
+    await tbl.flush()
 
-    // var upsert = ""
+    var PK = tbl.primary_key
+    var should_id = tbl.table_has_identity ? `SET IDENTITY_INSERT [${tbl.table_name}] ON;` : ''
+
+    var sql = `
+    ${should_id}
+    INSERT INTO [${tbl.table_name}](${tbl.columns_str})
+    SELECT ${tbl.columns.map(c => `SOURCE.[${c}]`)} FROM #temp_tbl SOURCE
+    LEFT JOIN ${tbl.table_name} TARGET ON TARGET.[${PK}] = SOURCE.[${PK}]
+    WHERE TARGET.[${PK}] IS NULL
+    `
+    await this.query(sql)
+
     if (this.options.merge) {
-      var res: m.IResult<{table: string, column: string}> = await this.query`
-        SELECT KU.table_name as [table], column_name as [column]
-        FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS AS TC
-        INNER JOIN
-          INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS KU
-                ON TC.CONSTRAINT_TYPE = 'PRIMARY KEY' AND
-                   TC.CONSTRAINT_NAME = KU.CONSTRAINT_NAME AND
-                   KU.table_name = ${this.table}
-        ORDER BY KU.TABLE_NAME, KU.ORDINAL_POSITION;`
+      // We're going to update too !
+      var sql = `
+        ${should_id}
+        UPDATE [${tbl.table_name}]
+        SET ${tbl.columns_sans_id.map(c => `[${c}] = SOURCE.[${c}]`).join(', ')}
+        FROM (
+          SELECT ${tbl.columns_str}
+          FROM #temp_tbl
+        ) AS SOURCE
+        WHERE SOURCE.[${PK}] = [${tbl.table_name}].[${PK}]
+      `
+      // console.log(sql)
+      await this.query(sql)
 
-      if (!res.recordset[0]) {
-        throw new Error(`table [${this.table}] does not have a primary key`)
-      }
-
-      var col = res.recordset[0].column as string
-
-      var all_columns = this.columns
-      // Get all the columns that we're inserting that are NOT the primary key
-      var columns = this.columns.filter(c => c!== col)
-
-      var has_identity = (await this.query`SELECT name FROM sys.identity_columns
-        WHERE OBJECT_NAME(OBJECT_ID) = ${this.table}`).recordset.length > 0
-
-      // We should probably compute what is the primary key of the table instead of assuming
-      // the column is called id
-      var res2 = await this.query(`
-        ${has_identity ? `SET IDENTITY_INSERT [${this.table}] ON;` : ''}
-
-        MERGE INTO [${this.table}] as TARGET
-        USING (
-          SELECT * FROM [##temp_table]
-        ) as SOURCE
-        ON (SOURCE.[${col}] = TARGET.[${col}])
-        WHEN NOT MATCHED THEN
-          INSERT (${all_columns.map(c => `[${c}]`).join(', ')})
-          VALUES (${all_columns.map(c => `SOURCE.[${c}]`).join(', ')})
-        WHEN MATCHED THEN
-          UPDATE SET ${columns.map(c => `TARGET.[${c}] = SOURCE.[${c}]`).join(', ')}
-        ;
-
-        ${has_identity ? `SET IDENTITY_INSERT [${this.table}] OFF;` : ''}
-        DROP TABLE ##temp_table;
-      `)
-
-      await this.send(Chunk.info(this, res2.rowsAffected.join(", ") + ' rows affected for ' + this.table))
-    } else {
-      await this.query(`
-        INSERT INTO [${table}](${this.columns_str})
-          SELECT ${this.columns_str} FROM [##temp_table];
-
-        DROP TABLE ##temp_table;
-      `)
+      // this.info(res2.rowsAffected.join(", ") + ' rows affected for ' + this.table)
     }
 
+    if (tbl.table_has_identity) {
+      await this.query(`SET IDENTITY_INSERT [${tbl.table_name}] OFF`)
+    }
+
+    await tbl.end()
   }
 }

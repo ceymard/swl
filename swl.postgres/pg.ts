@@ -99,7 +99,7 @@ export class PgSink extends Sink<
     if (this.options.notice) {
       db.on('notice', (notice: Error) => {
         const _ = notice as Error & {severity: string}
-        this.send(Chunk.info(this, `pg ${_.severity}: ${_.message}`))
+        this.info(`pg ${_.severity}: ${_.message}`)
       })
     }
 

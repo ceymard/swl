@@ -5,14 +5,14 @@ import * as s from '../slz'
 import ch from 'chalk'
 
 const c = ch.constructor({level: 3})
-const constant = c.hsl(0, 60, 60)
-const info = c.hsl(40, 60, 60)
-const str = c.hsl(80, 60, 60)
-const num = c.hsl(120, 60, 60)
-const date = c.hsl(140, 60, 60)
-const prop = c.hsl(180, 30, 30)
-const coll = c.hsl(220, 60, 60)
-const bool = c.hsl(280, 60, 60)
+export const constant = c.hsl(0, 60, 60)
+export const info = c.hsl(40, 60, 60)
+export const str = c.hsl(80, 60, 60)
+export const num = c.hsl(120, 60, 60)
+export const date = c.hsl(140, 60, 60)
+export const prop = c.hsl(180, 30, 30)
+export const coll = c.hsl(220, 60, 60)
+export const bool = c.hsl(280, 60, 60)
 
 
 
@@ -93,10 +93,6 @@ export class DebugTransformer extends Transformer<{data: boolean, other: boolean
     await this.send(chunk)
   }
 
-  async onInfo(chunk: Chunk.Info) {
-    process.stdout.write(info(`${chunk.source}: `) + chunk.message + '\n')
-    await this.send(chunk)
-  }
 }
 
 
@@ -110,10 +106,6 @@ export class NullSink extends Sink {
 
   async onData() {
 
-  }
-
-  async onInfo(chk: Chunk.Info) {
-    // await this.send(chk)
   }
 
   async onExec() {
