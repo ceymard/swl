@@ -103,7 +103,6 @@ export class MssqlSink extends Sink<
   table!: string
 
   async init() {
-    // console.log(this.options)
     const db = this.db = new m.ConnectionPool(`mssql://${await this.body}`)
     await db.connect()
     var tra = this.transaction = await db.transaction()
@@ -114,7 +113,6 @@ export class MssqlSink extends Sink<
   async query(req: string): Promise<m.IResult<any>>
   async query(req: TemplateStringsArray | string, ...args: any[]) {
     var request = this.transaction.request()
-    // console.log(req)
     if (typeof req === 'string') {
       return await request.query(req)
     }
@@ -204,7 +202,6 @@ export class MssqlSink extends Sink<
     await this.statement.unprepare()
     this.statement = null!
 
-    console.log('gonna merge now')
     // var upsert = ""
     if (this.options.merge) {
       var res: m.IResult<{table: string, column: string}> = await this.query`
@@ -220,16 +217,20 @@ export class MssqlSink extends Sink<
       if (!res.recordset[0]) {
         throw new Error(`table [${this.table}] does not have a primary key`)
       }
+
       var col = res.recordset[0].column as string
 
       var all_columns = this.columns
       // Get all the columns that we're inserting that are NOT the primary key
       var columns = this.columns.filter(c => c!== col)
 
+      var has_identity = (await this.query`SELECT name FROM sys.identity_columns
+        WHERE OBJECT_NAME(OBJECT_ID) = ${this.table}`).recordset.length > 0
+
       // We should probably compute what is the primary key of the table instead of assuming
       // the column is called id
       var res2 = await this.query(`
-        SET IDENTITY_INSERT [${this.table}] ON;
+        ${has_identity ? `SET IDENTITY_INSERT [${this.table}] ON;` : ''}
 
         MERGE INTO [${this.table}] as TARGET
         USING (
@@ -243,7 +244,7 @@ export class MssqlSink extends Sink<
           UPDATE SET ${columns.map(c => `TARGET.[${c}] = SOURCE.[${c}]`).join(', ')}
         ;
 
-        SET IDENTITY_INSERT [${this.table}] OFF;
+        ${has_identity ? `SET IDENTITY_INSERT [${this.table}] OFF;` : ''}
         DROP TABLE ##temp_table;
       `)
 
