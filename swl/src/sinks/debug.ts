@@ -85,9 +85,9 @@ export class DebugTransformer extends Transformer<{data: boolean, other: boolean
   async onData(chunk: Chunk.Data) {
     // if (this.options.data) {
       this.nb++
-      process.stdout.write(coll(`${this.current_collection}: ${this.nb} `))
-      print_value(process.stdout, chunk.payload)
-      process.stdout.write('\n')
+      process.stderr.write(coll(`${this.current_collection}: ${this.nb} `))
+      print_value(process.stderr, chunk.payload)
+      process.stderr.write('\n')
     // }
 
     await this.send(chunk)
