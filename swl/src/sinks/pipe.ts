@@ -35,7 +35,15 @@ export class PipeSource extends Source<{}, []> {
             in_obj = false
             if (count === 0) {
               var obj = tmp.slice(obj_start, pos + 1)
-              await this.send(JSON.parse(obj) as Chunk)
+              await this.send(JSON.parse(obj, (_, value) => {
+                if (typeof value === 'string') {
+                  var a = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)Z$/.exec(value);
+                  if (a) {
+                    return new Date(Date.UTC(+a[1], +a[2] - 1, +a[3], +a[4], +a[5], +a[6]));
+                  }
+                }
+                return value
+              }) as Chunk)
               // yield Chunk.data(JSON.parse(obj))
               // We remove the excess object and start again
               tmp = tmp.slice(pos + 1)
