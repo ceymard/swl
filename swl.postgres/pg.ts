@@ -93,7 +93,7 @@ export class PgSink extends Sink<
   columns_str!: string
 
   async init() {
-    const db = new pg.Client(`postgres://${await this.body}`)
+    const db = this.db = new pg.Client(`postgres://${await this.body}`)
     await db.connect()
 
     if (this.options.notice) {
@@ -151,6 +151,7 @@ export class PgSink extends Sink<
     this.columns_str = columns.map(c => `"${c}"`).join(', ')
 
     if (this.options.truncate) {
+      this.info(`truncating "${table}"`)
       await this.db.query(`DELETE FROM "${table}"`)
     }
 
