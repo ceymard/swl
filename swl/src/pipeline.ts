@@ -8,6 +8,13 @@ export type ChunkType =
 | 'exec'
 | 'info'
 
+
+export type PBase = string | number | boolean | null | Date
+export type PArray = PBase | PBase[]
+export type PObj = PArray | {[name: string]: PArray}
+export type Primitive = PObj | {[name: string]: PObj}
+
+
 export namespace Chunk {
   interface ChunkBase {
     readonly type: ChunkType
@@ -16,7 +23,7 @@ export namespace Chunk {
   export interface Data extends ChunkBase {
     readonly type: 'data'
     readonly collection: string
-    readonly payload: any
+    readonly payload: {[name: string]: Primitive}
   }
 
   export interface Exec extends ChunkBase {
