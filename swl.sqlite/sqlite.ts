@@ -61,21 +61,17 @@ export class SqliteSource extends Source<
 
     this.db = new S(this.filename, {readonly: true, fileMustExist: true})
 
-    this.db.register({
-      name: 'coalesce_join',
+    this.db.function('coalesce_join', {
       varargs: true, deterministic: true, safeIntegers: true}, coalesce_join)
-    this.db.register({
-      name: 'cleanup',
+    this.db.function('cleanup', {
       varargs: false,
       deterministic: true,
       safeIntegers: true}, cleanup)
-    this.db.register({
-      name: 'counter',
+    this.db.function('counter', {
       varargs: false,
       deterministic: false,
       safeIntegers: true}, counter)
-    this.db.register({
-      name: 'reset_counter',
+    this.db.function('reset_counter', {
       varargs: false,
       deterministic: false, safeIntegers: true}, reset_counter)
   }
@@ -92,7 +88,8 @@ export class SqliteSource extends Source<
       // Auto-detect *tables* (not views)
       // If no sources are specified, all the tables are outputed.
       const st = this.db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
-      keys = st.all().map(k => k.name)
+        .pluck<string>()
+      keys = st.all()
     }
 
     for (var colname of keys) {

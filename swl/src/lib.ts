@@ -16,18 +16,18 @@ export {slz as s, slz}
 export * from './types'
 
 function try_require(...names: string[]) {
-  for (var name of names) try { require(name) } catch (e) { }
+  for (var name of names) try { require(name) } catch (e) { console.log(e.stack) }
 }
 
 try_require(
-  'swl.json',
+  // 'swl.json',
   'swl.csv',
-  'swl.yaml',
+  // 'swl.yaml',
   'swl.postgres',
   'swl.sqlite',
-  'swl.imap',
-  'swl.mysql',
-  'swl.oracle',
+  // 'swl.imap',
+  // 'swl.mysql',
+  // 'swl.oracle',
   'swl.xlsx',
   'swl.mssql'
 )
