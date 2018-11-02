@@ -47,7 +47,7 @@ export class Sanitize extends Transformer<s.BaseType<typeof SANITIZE_OPTIONS>, s
     var p = chunk.payload
     var n: any = {}
     for (var x in p) {
-      n[ocolumns ? (column_cache[x] = column_cache[x] || san(x)) : x] = ovalues && typeof p[x] === 'string' ? san(p[x]) : p[x]
+      n[ocolumns ? (column_cache[x] = column_cache[x] || san(x)) : x] = ovalues && typeof p[x] === 'string' ? san(p[x] as string) : p[x]
     }
     await this.send(Chunk.data(ocolname ? san(chunk.collection) : chunk.collection, n))
   }
