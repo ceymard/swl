@@ -33,37 +33,40 @@ export function clone<T>(base: T, newprops: {[K in keyof T]?: T[K]}) {
 
 export class Serializer<T> {
 
-  public def: T | undefined | null = undefined
   public _help: string = ''
 
   // Just to be used as typeof s.TYPE
-  get TYPE(): T { return null! }
+  public TYPE!: T
 
   from(unk: unknown): T {
     return unk as T
   }
 
-
   default(def: T): Serializer<NonNullable<T>>
   default(def: null): Serializer<NonNullable<T> | null>
   default(def: T | null) {
-    var res = clone(this as Serializer<T>, {def})
-    if (def == null) {
-      return res.nullable()
-    }
-    return res
-  }
-
-  nullable(): Serializer<T | null> {
-
+    return this.transform((ser, v) => {
+      var res = ser.from(v)
+      return res !== undefined ? res : def
+    })
   }
 
   or<U>(spec: Serializer<U>): Serializer<T | U> {
+    return this.transform((ser, v) => {
+      try {
+        return ser.from(v)
+      } catch {
+        return spec.from(v)
+      }
+    })
+  }
+
+  when<K extends keyof T, V extends T[K], U>(key: K, value: V, ser: Serializer<U>) {
 
   }
 
-  when<K extends keyof T>(key: K, value: T[K], ) {
-
+  transform<U>(fn: (v: Serializer<T>, value: unknown) => U): Serializer<U> {
+    return new TransformSerializer(this, fn)
   }
 
   help(): string
@@ -78,17 +81,23 @@ export class Serializer<T> {
 }
 
 
+export class TransformSerializer<T, U> extends Serializer<U> {
+  constructor(public orig: Serializer<T>, public fn: (s: Serializer<T>, value: unknown) => U) {
+    super()
+    this._help = orig._help
+  }
+
+  from(v: unknown): U {
+    return this.fn(this.orig, v)
+  }
+}
+
+
+
 export type ObjectSerializerProps<T> = {[K in keyof T]: Serializer<T[K]>}
 
 
 export class ObjectSerializer<T extends object> extends Serializer<T> {
-
-  constructor(
-    public specs?: ObjectSerializerProps<T>,
-    public inst_type?: new (...a: any[]) => T
-  ) {
-    super()
-  }
 
   props<U>(props: ObjectSerializerProps<U>): ObjectSerializer<T & U> {
 
@@ -117,7 +126,7 @@ export class ObjectSerializer<T extends object> extends Serializer<T> {
    *  typescript, to ensure that there are no excess properties in the current
    *  object specification.
    */
-  createAs<T extends object, U extends Helper<T, keyof T>, V extends U = U>(
+  createAs<T extends object, U extends T, V extends U = U>(
     this: Serializer<U>,
     typ: new (...a: any[]) => T,
     typcheck2?: new (...a: any) => V
@@ -137,14 +146,10 @@ export class ObjectSerializer<T extends object> extends Serializer<T> {
 }
 
 
-export class BooleanSerializer extends Serializer<boolean> {
+export class BooleanSerializer extends Serializer<boolean | undefined> {
 
   from(t: unknown) {
-    return !!t || !!this.def
-  }
-
-  serialize(t: boolean) {
-    return !!t
+    return t !== undefined ? !!t : undefined
   }
 
 }
@@ -175,14 +180,14 @@ export class NumberSerializer extends Serializer<number | undefined> {
 }
 
 
-export class OrNull<T> extends Serializer<T | null> {
-
-}
-
-
-export function number(): Serializer<number>
-export function number(): Serializer<number> {
-
+export function number(n: null): Serializer<number | null>
+export function number(def: number): Serializer<number>
+export function number(): Serializer<number | undefined>
+export function number(def?: any): Serializer<any> {
+  var res = new NumberSerializer()
+  if (def !== undefined)
+    return res.default(def)
+  return res
 }
 
 
@@ -200,8 +205,13 @@ export function string(def?: string | null): Serializer<string | null | undefine
 export function object(): ObjectSerializer<{}>
 export function object<T extends object>(specs: ObjectSerializerProps<T>): ObjectSerializer<T>
 export function object<T extends object>(specs: ObjectSerializerProps<T>, inst?: new (...a: any[]) => T): Serializer<T>
-export function object<T extends object>(specs?: ObjectSerializerProps<T>, inst?: new (...a: any[]) => T) {
-  return new ObjectSerializer<T>(specs, inst)
+export function object<T extends object>(specs?: ObjectSerializerProps<T>, inst?: new (...a: any[]) => T): ObjectSerializer<any> {
+  var res = new ObjectSerializer<T>()
+  if (specs)
+    res = res.props(specs)
+  if (inst)
+    res = res.createAs(inst)
+  return res
 }
 
 export function boolean(): BooleanSerializer
@@ -214,31 +224,3 @@ export function boolean(def?: boolean) {
 }
 
 
-
-namespace Test {
-
-  class Test {
-    readonly a!: string | null
-    readonly c!: number
-  }
-
-  class Test2 extends Test {
-    d!: string
-  }
-
-  var a = object().optional({
-      a: string(null)
-    })
-  var b = a.props({
-    c: number(),
-    // d: string()
-  })
-  var c = b.createAs(Test, Test)
-
-  var d = c.props({
-    d: string()
-  })
-
-  var e = d.createAs(Test2, Test2)
-
-}
