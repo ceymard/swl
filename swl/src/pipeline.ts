@@ -1,5 +1,5 @@
 // import { Lock } from './streams'
-import { Parser } from 'parsimmon'
+import * as s from 'slz'
 import { Fragment, ADAPTER_AND_OPTIONS } from './cmdparse'
 
 export type ChunkType =
@@ -124,8 +124,8 @@ import { Lock } from './streams';
  * parser find them.
 */
 export class FactoryContainer {
-  map = {} as {[name: string]: new () => PipelineComponent<any, any> | undefined}
-  all = [] as {component: (new () => PipelineComponent<any, any>), mimes: string[]}[]
+  map = {} as {[name: string]: new () => PipelineComponent<any> | undefined}
+  all = [] as {component: (new () => PipelineComponent<any>), mimes: string[]}[]
 
   /**
    * Add a factory to the registry
@@ -133,7 +133,7 @@ export class FactoryContainer {
    * @param factory The factory function
    * @param mimes Extensions or mime types that this handler accepts
    */
-  add(mimes: string[], component: new () => PipelineComponent<any, any>) {
+  add(mimes: string[], component: new () => PipelineComponent<any>) {
     this.all.push({component, mimes})
     for (var name of mimes) {
       this.map[name] = component
@@ -152,7 +152,7 @@ export class FactoryContainer {
    * @param options Provided options to the factory
    * @param rest The rest of the command line string
    */
-  async get(name: string, options: any, rest: string): Promise<PipelineComponent<any, any> | null> {
+  async get(name: string, options: any, rest: string): Promise<PipelineComponent<any> | null> {
     var factory = this.map[name]
 
     if (!factory) {
@@ -212,7 +212,7 @@ export const transformers = new FactoryContainer()
  * Register a component class
  */
 export function register(...mimes: string[]) {
-  return function (target: new () => PipelineComponent<any, any>) {
+  return function (target: new () => PipelineComponent<any>) {
     var proto = Object.getPrototypeOf(target)
     if (proto === Source || proto instanceof Source) {
       sources.add(mimes, target)
@@ -233,7 +233,7 @@ export function register(...mimes: string[]) {
  * next component as upstream()
  * @param components The pipeline of components to connect.
  */
-export function instantiate_pipeline(components: PipelineComponent<any, any>[], initial?: ChunkStream) {
+export function instantiate_pipeline(components: PipelineComponent<any>[], initial?: ChunkStream) {
 
   if (!initial) {
     initial = new ChunkStream()
@@ -252,7 +252,7 @@ export function instantiate_pipeline(components: PipelineComponent<any, any>[], 
 
 
 export async function build_pipeline(fragments: Fragment[]) {
-  const pipe = [] as PipelineComponent<any, any>[]
+  const pipe = [] as PipelineComponent<any>[]
   for (var f of fragments) {
 
     var [_name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
@@ -281,13 +281,11 @@ export interface OptionsParser<T> {
 export const MAX_STACK_SIZE = 8192
 
 
-export abstract class PipelineComponent<O, B> {
+export abstract class PipelineComponent<O> {
 
   abstract help: string
   abstract options_parser: OptionsParser<O> | null
   options!: O
-  abstract body_parser: Parser<B> | null
-  body!: B
 
   upstream!: ChunkStream
   stream = new ChunkStream()
@@ -362,7 +360,7 @@ export abstract class PipelineComponent<O, B> {
 }
 
 
-export abstract class Source<O, B> extends PipelineComponent<O, B> {
+export abstract class Source<O> extends PipelineComponent<O> {
 
   async process() {
     // The source simply forwards everything from upstream
@@ -379,7 +377,7 @@ export abstract class Source<O, B> extends PipelineComponent<O, B> {
 }
 
 
-export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
+export abstract class Sink<O = {}> extends PipelineComponent<O> {
 
   async process() {
     var current_collection: string | null = null
@@ -426,9 +424,11 @@ export abstract class Sink<O = {}, B = []> extends PipelineComponent<O, B> {
  * A transformer is a sink, except it is expected of it that it
  * will keep forwarding stuff
  */
-export abstract class Transformer<O = {}, B = []> extends Sink<O, B> {
+export abstract class Transformer<O = {}> extends Sink<O> {
 
 }
 
+
 import { info, print_value } from './sinks/debug'
-import { slz } from './lib';
+
+// import { slz, s } from './lib';
