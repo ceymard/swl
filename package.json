@@ -8,6 +8,7 @@
     "postinstall": "yarn build"
   },
   "workspaces": [
+    "./deps/*",
     "./swl*",
     "./clion"
   ],

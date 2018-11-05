@@ -10,7 +10,7 @@ export * from './streams'
 export * from './pipeline'
 import './sinks'
 
-import * as slz from './slz'
+import * as slz from 'slz'
 export {slz as s, slz}
 
 export * from './types'
