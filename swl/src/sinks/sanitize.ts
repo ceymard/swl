@@ -1,5 +1,5 @@
 import { Transformer, register, Chunk } from '../pipeline'
-import * as s from '../slz'
+import * as s from 'slz'
 
 
 // var _cache = {} as {[str: string]: string}

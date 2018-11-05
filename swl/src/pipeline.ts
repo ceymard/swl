@@ -156,15 +156,20 @@ export class FactoryContainer {
     var factory = this.map[name]
 
     if (!factory) {
+      // Try to see if we have a URI (like protocol://some_uri), in which
+      // case the protocol name will be used to find the correct factory
       const re_uri = /^([\w]+):\/\//
       const match = re_uri.exec(name)
       if (match) {
         factory = this.map[match[1]]
+        // in that case, we elide the protocol from the string
         rest = `${name.replace(match[0], '')} ${rest}`
       }
     }
 
     if (!factory) {
+      // Try to parse a regular file path name and from its extension
+      // get a factory.
       const a = p.parse(name)
       factory = this.map[a.ext]
       rest = rest ? name + ' ' + rest : name
@@ -426,3 +431,4 @@ export abstract class Transformer<O = {}, B = []> extends Sink<O, B> {
 }
 
 import { info, print_value } from './sinks/debug'
+import { slz } from './lib';

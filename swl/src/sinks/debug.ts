@@ -1,6 +1,6 @@
 
 import { Transformer, register, Sink, Chunk } from '../pipeline'
-import * as s from '../slz'
+import * as s from 'slz'
 
 import ch from 'chalk'
 
