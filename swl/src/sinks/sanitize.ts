@@ -26,7 +26,7 @@ const SANITIZE_OPTIONS = s.object({
 
 
 @register('sanitize')
-export class Sanitize extends Transformer<s.BaseType<typeof SANITIZE_OPTIONS>, string> {
+export class Sanitize extends Transformer<typeof SANITIZE_OPTIONS.TYPE, string> {
   help = `Sanitize object input by removing non-ascii characters`
 
   options_parser = SANITIZE_OPTIONS

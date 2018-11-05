@@ -173,7 +173,7 @@ export class FactoryContainer {
     if (!factory) return null
 
     var handler = new factory()!
-    handler.options = handler.options_parser ? handler.options_parser.deserialize(options) : options
+    handler.options = handler.options_parser ? handler.options_parser.from(options) : options
     const parser = handler.body_parser
     var parsed: any = rest
     if (parser) {
@@ -269,7 +269,7 @@ export async function build_pipeline(fragments: Fragment[]) {
 
 
 export interface OptionsParser<T> {
-  deserialize(unk: unknown): T
+  from(unk: unknown): T
 }
 
 

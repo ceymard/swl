@@ -13,12 +13,27 @@ declare module 'mssql' {
 const MSSQL_SRC_OPTIONS = s.object({
 
 })
+
 const MSSQL_SRC_BODY = Sequence(URI, OPT_OBJECT)
+
+
+const MSSQL_SRC = s.tuple(
+  s.string(), // the URI
+  s.object(), // the options
+  s.array(s.indexed( // at last, the sources
+    s.boolean()
+    .or(s.string())
+    .or(s.object({
+      query: s.string().required(),
+      columns: s.array(s.string().required())
+    }))
+  ))
+)
 
 
 @register('mssql', 'ms')
 export class MssqlSource extends Source<
-  s.BaseType<typeof MSSQL_SRC_OPTIONS>,
+  typeof MSSQL_SRC_OPTIONS.TYPE,
   ParserType<typeof MSSQL_SRC_BODY>
 > {
 
@@ -186,7 +201,7 @@ export class MssqlTableHandler {
 
 @register('mssql', 'ms')
 export class MssqlSink extends Sink<
-  s.BaseType<typeof MSSQL_SINK_OPTIONS>,
+  typeof MSSQL_SINK_OPTIONS.TYPE,
   ParserType<typeof URI>
 > {
   help = `Write to a PostgreSQL Database`

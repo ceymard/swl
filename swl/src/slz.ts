@@ -51,6 +51,15 @@ export class Serializer<T> {
     })
   }
 
+  required(): Serializer<NonNullable<T>> {
+    return this.transform((ser, v) => {
+      var res = ser.from(v)
+      if (res == undefined)
+        throw new Error(`this reader requires a value`)
+      return res as NonNullable<T>
+    })
+  }
+
   or<U>(spec: Serializer<U>): Serializer<T | U> {
     return this.transform((ser, v) => {
       try {
@@ -213,6 +222,25 @@ export function object<T extends object>(specs?: ObjectSerializerProps<T>, inst?
     res = res.createAs(inst)
   return res
 }
+
+
+export function indexed<T>(items: Serializer<T>): Serializer<{[name: string]: T}> {
+  return null!
+}
+
+
+export type Unserializify<T> = T extends Serializer<infer U> ? U : T
+
+
+export function tuple<Arr extends Serializer<any>[]>(...sers: Arr): Serializer<{[K in keyof Arr]: Unserializify<Arr[K]>} | undefined> {
+  return null!
+}
+
+
+export function array<T>(items: Serializer<T>): Serializer<T[] | undefined> {
+  return null!
+}
+
 
 export function boolean(): BooleanSerializer
 export function boolean(def: boolean): Serializer<boolean>
