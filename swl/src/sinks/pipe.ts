@@ -1,9 +1,12 @@
 import { Sink, register, Chunk, Source } from "../pipeline";
+import * as s from 'slz'
 import { StreamWrapper } from "../streams";
 
 
+const PIPE_OPTIONS = s.object()
+
 @register('pipe')
-export class PipeSource extends Source<{}, []> {
+export class PipeSource extends Source(PIPE_OPTIONS) {
 
   help = `A piping to use with unix pipes`
   options_parser = null
@@ -65,9 +68,7 @@ export class PipeSource extends Source<{}, []> {
 
 
 @register('pipe')
-export class PipeSink extends Sink<
-  {}, []
-> {
+export class PipeSink extends Sink(PIPE_OPTIONS) {
 
   help = `A piping to use with unix pipes`
   options_parser = null

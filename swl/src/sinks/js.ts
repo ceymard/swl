@@ -1,14 +1,13 @@
 
 import { register, Transformer, Chunk } from '../pipeline'
 import * as R from 'ramda'
+import * as s from 'slz'
 
 
 @register('js')
-export class Js extends Transformer<{}, string> {
+export class Js extends Transformer(s.string()) {
 
   help = `Build a javascript function and run it.`
-  options_parser = null
-  body_parser = null
 
   R = R
   fn!: Function
@@ -16,7 +15,7 @@ export class Js extends Transformer<{}, string> {
   current_collection = ''
 
   async init() {
-    this.fn = eval(this.body)
+    this.fn = eval(this.params)
   }
 
   async onCollectionStart(chk: Chunk.Data) {
@@ -49,7 +48,7 @@ export class JsObj extends Js {
   `
 
   async init() {
-    this.fn = eval(`(_, collection, i) => { return {..._, ${this.body}} }`)
+    this.fn = eval(`(_, collection, i) => { return {..._, ${this.params}} }`)
   }
 
 }

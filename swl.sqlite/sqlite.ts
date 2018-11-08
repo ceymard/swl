@@ -30,22 +30,16 @@ function reset_counter(name: string) {
 }
 
 
-const SQLITE_SOURCE_OPTIONS = s.object({
-  uncoerce: s.boolean(false)
-})
-
-const SQLITE_BODY = Sequence(URI, OPT_OBJECT).name`SQlite Options`
-
 @register('sqlite', 'sqlite3', '.db', '.sqlite', '.sqlite3')
-export class SqliteSource extends Source<
-  s.BaseType<typeof SQLITE_SOURCE_OPTIONS>,
-  ParserType<typeof SQLITE_BODY>
-  >
+export class SqliteSource extends Source(s.tuple(
+  s.string(), // uri !
+  s.object({uncoerce: s.boolean(false)}),
+  s.array(s.indexed(
+    s.boolean().or(s.string())
+  ))
+))
 {
   help = `Read an SQLite database`
-
-  options_parser = SQLITE_SOURCE_OPTIONS
-  body_parser = SQLITE_BODY
 
   // ????
   uncoerce!: boolean
@@ -55,8 +49,8 @@ export class SqliteSource extends Source<
   db!: S
 
   async init() {
-    this.filename = await this.body[0]
-    this.sources = this.body[1]
+    this.filename = this.params[0]
+    this.sources = this.params[1]
     this.uncoerce = this.options.uncoerce
 
     this.db = new S(this.filename, {readonly: true, fileMustExist: true})

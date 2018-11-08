@@ -124,8 +124,8 @@ import { Lock } from './streams';
  * parser find them.
 */
 export class FactoryContainer {
-  map = {} as {[name: string]: new () => PipelineComponent<any> | undefined}
-  all = [] as {component: (new () => PipelineComponent<any>), mimes: string[]}[]
+  map = {} as {[name: string]:typeof PipelineComponent | undefined}
+  all = [] as {component: typeof PipelineComponent, mimes: string[]}[]
 
   /**
    * Add a factory to the registry
@@ -133,7 +133,7 @@ export class FactoryContainer {
    * @param factory The factory function
    * @param mimes Extensions or mime types that this handler accepts
    */
-  add(mimes: string[], component: new () => PipelineComponent<any>) {
+  add(mimes: string[], component:typeof PipelineComponent) {
     this.all.push({component, mimes})
     for (var name of mimes) {
       this.map[name] = component
@@ -152,7 +152,7 @@ export class FactoryContainer {
    * @param options Provided options to the factory
    * @param rest The rest of the command line string
    */
-  async get(name: string, options: any, rest: string): Promise<PipelineComponent<any> | null> {
+  async get(name: string, options: any, rest: string): Promise<PipelineComponent | null> {
     var factory = this.map[name]
 
     if (!factory) {
@@ -177,9 +177,14 @@ export class FactoryContainer {
 
     if (!factory) return null
 
-    var handler = new factory()!
-    handler.options = handler.options_parser ? handler.options_parser.from(options) : options
-    const parser = handler.body_parser
+    // This is probably not what we want to do !!!
+    var params = factory.builder.from(options)
+    // We need to parse the `rest` to further aliment the options
+
+
+    var handler = new factory(params)
+    handler.params = factory.builder ? factory.builder.from(options) : options
+    const parser = factory.body_parser
     var parsed: any = rest
     if (parser) {
       const result = parser.parse(rest)
@@ -212,9 +217,9 @@ export const transformers = new FactoryContainer()
  * Register a component class
  */
 export function register(...mimes: string[]) {
-  return function (target: new () => PipelineComponent<any>) {
+  return function (target:typeof PipelineComponent) {
     var proto = Object.getPrototypeOf(target)
-    if (proto === Source || proto instanceof Source) {
+    if (proto === SourceComponent || proto instanceof SourceComponent) {
       sources.add(mimes, target)
     } else if (proto === Transformer || proto instanceof Transformer) {
       transformers.add(mimes, target)
@@ -233,7 +238,7 @@ export function register(...mimes: string[]) {
  * next component as upstream()
  * @param components The pipeline of components to connect.
  */
-export function instantiate_pipeline(components: PipelineComponent<any>[], initial?: ChunkStream) {
+export function instantiate_pipeline(components: PipelineComponent[], initial?: ChunkStream) {
 
   if (!initial) {
     initial = new ChunkStream()
@@ -252,7 +257,7 @@ export function instantiate_pipeline(components: PipelineComponent<any>[], initi
 
 
 export async function build_pipeline(fragments: Fragment[]) {
-  const pipe = [] as PipelineComponent<any>[]
+  const pipe = [] as PipelineComponent[]
   for (var f of fragments) {
 
     var [_name, opts, rest] = ADAPTER_AND_OPTIONS.tryParse(f.inst)
@@ -273,22 +278,19 @@ export async function build_pipeline(fragments: Fragment[]) {
 }
 
 
-export interface OptionsParser<T> {
-  from(unk: unknown): T
-}
-
 
 export const MAX_STACK_SIZE = 8192
 
 
-export abstract class PipelineComponent<O> {
+export class PipelineComponent {
 
-  abstract help: string
-  abstract options_parser: OptionsParser<O> | null
-  options!: O
+  help: string = 'No help provided by implementor'
+  static builder: s.Builder<any>
 
   upstream!: ChunkStream
   stream = new ChunkStream()
+
+  constructor(public params: any) { }
 
   /**
    * Send chunks down the pipeline
@@ -360,7 +362,7 @@ export abstract class PipelineComponent<O> {
 }
 
 
-export abstract class Source<O> extends PipelineComponent<O> {
+export class SourceComponent extends PipelineComponent {
 
   async process() {
     // The source simply forwards everything from upstream
@@ -372,12 +374,12 @@ export abstract class Source<O> extends PipelineComponent<O> {
   /**
    * This function must be redefined
    */
-  abstract async emit(): Promise<void>
+  async emit(): Promise<void> { }
 
 }
 
 
-export abstract class Sink<O = {}> extends PipelineComponent<O> {
+export class SinkComponent extends PipelineComponent {
 
   async process() {
     var current_collection: string | null = null
@@ -424,11 +426,36 @@ export abstract class Sink<O = {}> extends PipelineComponent<O> {
  * A transformer is a sink, except it is expected of it that it
  * will keep forwarding stuff
  */
-export abstract class Transformer<O = {}> extends Sink<O> {
+export abstract class TransformerComponent extends SinkComponent {
 
 }
 
 
-import { info, print_value } from './sinks/debug'
+export function Source<T>(builder: s.Builder<T>) {
+  return class Src extends SourceComponent {
+    static builder = builder
 
-// import { slz, s } from './lib';
+    async emit() {
+
+    }
+  }
+}
+
+export function Sink<T>(builder: s.Builder<T>) {
+  return class Snk extends SinkComponent {
+    static builder = builder
+
+    builder = builder
+  }
+}
+
+export function Transformer<T>(builder: s.Builder<T>) {
+  return class Transformer extends TransformerComponent {
+    static builder = builder
+
+    builder = builder
+  }
+}
+
+
+import { info, print_value } from './sinks/debug'

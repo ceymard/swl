@@ -1,9 +1,7 @@
 import * as s from 'slz'
-import { build_pipeline, PipelineComponent, instantiate_pipeline } from '../pipeline'
-import { ARRAY_CONTENTS } from 'clion'
-import { URI, FRAGMENTS } from '../cmdparse'
+import { build_pipeline, PipelineComponent, instantiate_pipeline, register } from '../pipeline'
+import { FRAGMENTS } from '../cmdparse'
 
-import * as P from 'parsimmon'
 import {readFileSync} from 'fs'
 
 
@@ -29,23 +27,26 @@ async function build_swl_file_pipeline(path: string, argv: any[], opts: any) {
 
 
 export const SWL_PARSER_OPTIONS = s.tuple(
-  s.string().required(), // file
+  s.string(), // file
   s.object(), // options
   s.array(s.object())
 )
 
 
-export class Swl extends PipelineComponent<typeof SWL_PARSER_OPTIONS.TYPE> {
+@register('swl', '.swl')
+export class Swl extends PipelineComponent {
 
   help = `Read swl statements from a file`
-  options_parser = SWL_PARSER_OPTIONS
 
-  pipeline!: PipelineComponent<any>[]
+  static builder = SWL_PARSER_OPTIONS
+  params!: typeof SWL_PARSER_OPTIONS.TYPE
+
+  pipeline!: PipelineComponent[]
 
   async init() {
-    var file = await this.options[0]
-    var options = this.options[1]
-    var argv = this.options[2]
+    var file = this.params[0]
+    var options = this.params[1]
+    var argv = this.params[2]
     this.pipeline = await build_swl_file_pipeline(file, argv || [], options)
   }
 

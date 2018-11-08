@@ -1,18 +1,16 @@
 import { Sink, Chunk, register } from '../pipeline'
-import { ARRAY_CONTENTS } from 'clion'
+import * as s from 'slz'
 
 
 @register('pick')
-export class Pick extends Sink<{}, any[]> {
+export class Pick extends Sink(s.array(s.object())) {
   help = `Pick properties from records`
-  options_parser = null
-  body_parser = ARRAY_CONTENTS
 
   regexps: RegExp[] = []
   props: Set<string|number> = new Set()
 
   async init() {
-    for (var p of this.body) {
+    for (var p of this.params) {
       if (typeof p === 'string' || typeof p === 'number')
         this.props.add(p)
       else if (p instanceof RegExp)

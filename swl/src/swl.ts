@@ -9,7 +9,7 @@ import { PipelineComponent } from './pipeline';
 const args = process.argv.slice(2)
 // console.log(args)
 
-function renderDoc(obj: PipelineComponent<any, any>) {
+function renderDoc(obj: PipelineComponent) {
   const marked = require('marked')
   const TerminalRenderer = require('marked-terminal')
 
@@ -22,7 +22,7 @@ function renderDoc(obj: PipelineComponent<any, any>) {
   console.log(marked(obj.help))
 }
 
-function displaySimple(obj: PipelineComponent<any, any>, mimes: string[], color: ((s: string) => string)) {
+function displaySimple(obj: PipelineComponent, mimes: string[], color: ((s: string) => string)) {
   const first = obj.help.split('\n').map(l => l.trim()).filter(id => id)[0]
   console.log(`  - ${color(mimes[0])}${mimes.length > 1 ? ' ' : ''}${chalk.gray(mimes.slice(1).join(', '))} ${first}`)
   // renderDoc(obj)
@@ -44,23 +44,23 @@ async function run() {
     if (second) {
       for (var sink of [...sources, ...transformers, ...sinks])
         if (sink.mimes.filter(m => m === second).length > 0) {
-          renderDoc(new sink.component())
+          renderDoc(new sink.component({}))
         }
       return
     }
 
     console.log(`\nAvailable source adapters:\n`)
     for (var src of sources) {
-      displaySimple(new src.component, src.mimes, chalk.blueBright)
+      displaySimple(new src.component({}), src.mimes, chalk.blueBright)
     }
 
     console.log(`\nAvailable transformers:\n`)
     for (var tr of transformers)
-      displaySimple(new tr.component, tr.mimes, chalk.yellowBright)
+      displaySimple(new tr.component({}), tr.mimes, chalk.yellowBright)
 
     console.log(`\nAvalaible sinks:\n`)
     for (var sink of sinks) {
-      displaySimple(new sink.component, sink.mimes, chalk.redBright)
+      displaySimple(new sink.component({}), sink.mimes, chalk.redBright)
     }
     return
   }

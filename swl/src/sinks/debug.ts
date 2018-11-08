@@ -63,7 +63,7 @@ const DEBUG_OPTIONS = s.object({
 
 
 @register('debug')
-export class DebugTransformer extends Transformer<{data: boolean, other: boolean}, []> {
+export class DebugTransformer extends Transformer(s.object({data: s.boolean(), other: s.boolean()})) {
 
   help = `Print chunks to the console.
 
@@ -98,10 +98,8 @@ export class DebugTransformer extends Transformer<{data: boolean, other: boolean
 
 
 @register('null')
-export class NullSink extends Sink {
+export class NullSink extends Sink(s.object()) {
 
-  options_parser = null
-  body_parser = null
   help = `Lose the chunks and don't forward them.`
 
   async onData() {

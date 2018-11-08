@@ -1,17 +1,15 @@
 
-import {Chunk, Source, register} from 'swl'
+import {Chunk, Source, register, s} from 'swl'
 
 
 @register('inline')
-export class InlineJson extends Source<
-  {}, string
-> {
+export class InlineJson extends Source(s.string()) {
   help = `Inline Json`
   options_parser = null
   body_parser = null
 
   async emit() {
-    var rest = this.body.trim()
+    var rest = this.params.trim()
     if (rest[0] !== '[')
       rest = `[${rest}]`
     for (var c of eval(rest)) {

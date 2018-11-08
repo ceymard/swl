@@ -19,27 +19,25 @@ function san(str: string): string {
 
 
 const SANITIZE_OPTIONS = s.object({
-  columns: s.boolean().default(true),
-  collections: s.boolean().default(true),
-  values: s.boolean().default(false)
-})
-
+    columns: s.boolean().default(true),
+    collections: s.boolean().default(true),
+    values: s.boolean().default(false)
+  })
 
 @register('sanitize')
-export class Sanitize extends Transformer<typeof SANITIZE_OPTIONS.TYPE, string> {
+export class Sanitize extends Transformer(SANITIZE_OPTIONS) {
   help = `Sanitize object input by removing non-ascii characters`
 
   options_parser = SANITIZE_OPTIONS
-  body_parser = null
   column_cache = {} as  {[s: string]: string}
 
   async onData(chunk: Chunk.Data) {
-    var ocolname = this.options.collections
-    var ocolumns = this.options.columns
-    var ovalues = this.options.values
+    var ocolname = this.params.collections
+    var ocolumns = this.params.columns
+    var ovalues = this.params.values
     var column_cache = this.column_cache
 
-    if (!this.options.columns && !this.options.values) {
+    if (!this.params.columns && !this.params.values) {
       await this.send(chunk)
       return
     }

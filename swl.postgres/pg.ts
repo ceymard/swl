@@ -1,5 +1,5 @@
 
-import {Sequence, Chunk, s, Sink, URI, OPT_OBJECT, StreamWrapper, Source, ParserType, register} from 'swl'
+import {Chunk, s, Sink, URI, StreamWrapper, Source, ParserType, register} from 'swl'
 import * as pg from 'pg'
 import * as _ from 'csv-stringify'
 const copy_from = require('pg-copy-streams').from
@@ -7,15 +7,10 @@ const copy_from = require('pg-copy-streams').from
 const PG_SRC_OPTIONS = s.object({
 
 })
-const PG_SRC_BODY = Sequence(URI, OPT_OBJECT)
 
 @register('pg', 'postgres')
-export class PgSource extends Source<
-  s.BaseType<typeof PG_SRC_OPTIONS>,
-  ParserType<typeof PG_SRC_BODY>
-> {
+export class PgSource extends Source(PG_SRC_OPTIONS) {
   help = `Read from a PostgreSQL database`
-  body_parser = PG_SRC_BODY
   options_parser = PG_SRC_OPTIONS
 
   sources: {[name: string]: boolean | string} = {}
