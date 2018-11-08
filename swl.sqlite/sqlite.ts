@@ -1,5 +1,5 @@
 
-import {Sequence, OPT_OBJECT, URI, s, Chunk, Source, register, ParserType, Sink } from 'swl'
+import {URI, s, Chunk, Source, register, Sink } from 'swl'
 import * as S from 'better-sqlite3'
 
 
@@ -41,18 +41,15 @@ export class SqliteSource extends Source(s.tuple(
 {
   help = `Read an SQLite database`
 
-  // ????
-  uncoerce!: boolean
-  filename!: string
-  sources!: {[name: string]: boolean | string}
+  // sources!: {[name: string]: boolean | string}
 
   db!: S
 
-  async init() {
-    this.filename = this.params[0]
-    this.sources = this.params[1]
-    this.uncoerce = this.options.uncoerce
+  filename = this.params[0]
+  options = this.params[1]
+  sources = this.params[2]
 
+  async init() {
     this.db = new S(this.filename, {readonly: true, fileMustExist: true})
 
     this.db.function('coalesce_join', {
@@ -98,7 +95,7 @@ export class SqliteSource extends Source(s.tuple(
       this.info(`Started ${colname}`)
       var iterator = (stmt as any).iterate() as IterableIterator<any>
       for (var s of iterator) {
-        if (this.uncoerce) {
+        if (this.options.uncoerce) {
           var s2: any = {}
           for (var x in s)
             s2[x] = uncoerce(s[x])
@@ -114,35 +111,35 @@ export class SqliteSource extends Source(s.tuple(
 
 }
 
-export const SQLITE_SINK_OPTIONS = s.object({
-  truncate: s.boolean(false),
-  drop: s.boolean(false),
-  pragma: s.boolean(true)
-})
+export const SQLITE_SINK_OPTIONS = s.tuple(
+  s.string(),
+  s.object({
+    truncate: s.boolean(false),
+    drop: s.boolean(false),
+    pragma: s.boolean(true)
+  })
+)
 
 export const SQLITE_SINK_BODY = URI
 
 @register('sqlite', '.db', '.sqlite', '.sqlite3')
-export class SqliteSink extends Sink<
-  s.BaseType<typeof SQLITE_SINK_OPTIONS>,
-  ParserType<typeof URI>
-> {
+export class SqliteSink extends Sink(SQLITE_SINK_OPTIONS) {
 
   help = `Write to a SQLite database`
-  options_parser = SQLITE_SINK_OPTIONS
-  body_parser = URI
 
   mode = 'insert' as 'insert' | 'upsert' | 'update'
 
   table = ''
   db!: S
+  filename = this.params[0]
+  options = this.params[1]
 
   pragmas: {[name: string]: any} = {}
   columns: string[] = []
   stmt: {run(...a:any): any} = undefined!
 
   async init() {
-    const db = new S(await this.body, {})
+    const db = new S(this.filename, {})
     this.db = db
 
     if (this.options.pragma) {

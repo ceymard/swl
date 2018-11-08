@@ -80,10 +80,7 @@ const OPTS_MARKER = R(/[%\?]/)
 export const URI = Either(
   // QUOTED,
   R(/[^\s\n\r \t%\?]+/m)
-).map(u => {
-  return open_tunnel(u)
-})
-
+)
 
 
 export const URI_WITH_OPTS = P.seqMap(
@@ -93,7 +90,7 @@ export const URI_WITH_OPTS = P.seqMap(
     P.seqMap(OPTS_MARKER, OBJECT, P.optWhitespace, (_q, ob) => ob),
     __.map(_ => null)
   ),
-  (_1, uri, opts) => [uri, opts || {}] as [Promise<string>, {[name: string]: any}]
+  (_1, uri, opts) => [uri, opts || {}] as [string, {[name: string]: any}]
 )
 
 
@@ -124,7 +121,7 @@ export const ADAPTER_AND_OPTIONS = P.seqMap(
   ),
   P.all,
   (_1, uri, opts, rest) => {
-    return [uri, opts || {}, rest] as [Promise<string>, {[name: string]: any}, string]
+    return [uri, opts || {}, rest] as [string, {[name: string]: any}, string]
   }
 )
 

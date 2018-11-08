@@ -119,13 +119,18 @@ export class ChunkStream {
 import * as p from 'path'
 import { Lock } from './streams';
 
+export interface Factory<T> {
+  new (p: T): PipelineComponent
+  builder: s.Builder<T>
+}
+
 /**
  * We use this class to store named factories so that the command
  * parser find them.
 */
 export class FactoryContainer {
-  map = {} as {[name: string]:typeof PipelineComponent | undefined}
-  all = [] as {component: typeof PipelineComponent, mimes: string[]}[]
+  map = {} as {[name: string]: Factory<any> | undefined}
+  all = [] as {component:  Factory<any>, mimes: string[]}[]
 
   /**
    * Add a factory to the registry
@@ -133,7 +138,7 @@ export class FactoryContainer {
    * @param factory The factory function
    * @param mimes Extensions or mime types that this handler accepts
    */
-  add(mimes: string[], component:typeof PipelineComponent) {
+  add(mimes: string[], component: Factory<any>) {
     this.all.push({component, mimes})
     for (var name of mimes) {
       this.map[name] = component
@@ -178,31 +183,37 @@ export class FactoryContainer {
     if (!factory) return null
 
     // This is probably not what we want to do !!!
-    var params = factory.builder.from(options)
+    var builder = factory.builder
+    var params = {} as any
+
+    if (builder.constructor === s.StringBuilder) {
+      params = rest
+    } else if (builder.constructor === s.TupleBuilder) {
+
+    } else if (builder.constructor === s.ArrayBuilder) {
+
+    }
+
+    var params = builder.from(options)
     // We need to parse the `rest` to further aliment the options
 
 
     var handler = new factory(params)
-    handler.params = factory.builder ? factory.builder.from(options) : options
-    const parser = factory.body_parser
-    var parsed: any = rest
-    if (parser) {
-      const result = parser.parse(rest)
-      if (result.status) {
-        parsed = await result.value
-        handler.body = parsed
-      } else {
 
-        // const offset = result.index.offset
-        // const r = rest.slice(offset)
-        // console.log(rest)
-        throw new Error(`Expected ${result.expected}`)
-      }
-    }
+    // var parsed: any = rest
+    // if (parser) {
+    //   const result = parser.parse(rest)
+    //   if (result.status) {
+    //     parsed = await result.value
+    //     handler.body = parsed
+    //   } else {
 
-    if (Array.isArray(parsed)) {
-      parsed = await (Promise.all(parsed))
-    }
+    //     // const offset = result.index.offset
+    //     // const r = rest.slice(offset)
+    //     // console.log(rest)
+    //     throw new Error(`Expected ${result.expected}`)
+    //   }
+    // }
 
     return handler
   }
@@ -217,13 +228,13 @@ export const transformers = new FactoryContainer()
  * Register a component class
  */
 export function register(...mimes: string[]) {
-  return function (target:typeof PipelineComponent) {
+  return function (target: Factory<any>) {
     var proto = Object.getPrototypeOf(target)
     if (proto === SourceComponent || proto instanceof SourceComponent) {
       sources.add(mimes, target)
-    } else if (proto === Transformer || proto instanceof Transformer) {
+    } else if (proto === TransformerComponent || proto instanceof TransformerComponent) {
       transformers.add(mimes, target)
-    } else if (proto === Sink || proto instanceof Sink) {
+    } else if (proto === SinkComponent || proto instanceof SinkComponent) {
       sinks.add(mimes, target)
     } else {
       sources.add(mimes, target)
@@ -289,8 +300,6 @@ export class PipelineComponent {
 
   upstream!: ChunkStream
   stream = new ChunkStream()
-
-  constructor(public params: any) { }
 
   /**
    * Send chunks down the pipeline
@@ -435,6 +444,8 @@ export function Source<T>(builder: s.Builder<T>) {
   return class Src extends SourceComponent {
     static builder = builder
 
+    constructor(public params: T) { super() }
+
     async emit() {
 
     }
@@ -444,7 +455,7 @@ export function Source<T>(builder: s.Builder<T>) {
 export function Sink<T>(builder: s.Builder<T>) {
   return class Snk extends SinkComponent {
     static builder = builder
-
+    constructor(public params: T) { super() }
     builder = builder
   }
 }
@@ -452,7 +463,7 @@ export function Sink<T>(builder: s.Builder<T>) {
 export function Transformer<T>(builder: s.Builder<T>) {
   return class Transformer extends TransformerComponent {
     static builder = builder
-
+    constructor(public params: T) { super() }
     builder = builder
   }
 }

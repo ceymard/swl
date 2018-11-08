@@ -1,5 +1,5 @@
 
-import { s, Source, Sequence, URI, OPT_OBJECT, ParserType, Chunk, register, Sink } from 'swl'
+import { s, Source, Chunk, register, Sink, open_tunnel } from 'swl'
 
 import * as m from 'mssql'
 
@@ -10,52 +10,35 @@ declare module 'mssql' {
 }
 
 
-const MSSQL_SRC_OPTIONS = s.object({
-
-})
-
-const MSSQL_SRC_BODY = Sequence(URI, OPT_OBJECT)
-
-
 const MSSQL_SRC = s.tuple(
-  s.string(), // the URI
+  s.string().then(s => s.ok(open_tunnel(s.value))), // the URI
   s.object(), // the options
   s.array(s.indexed( // at last, the sources
     s.boolean()
     .or(s.string())
-    .or(s.object({
-      query: s.string().required(),
-      columns: s.array(s.string().required())
-    }))
   ))
 )
 
 
 @register('mssql', 'ms')
-export class MssqlSource extends Source<
-  typeof MSSQL_SRC_OPTIONS.TYPE,
-  ParserType<typeof MSSQL_SRC_BODY>
-> {
+export class MssqlSource extends Source(MSSQL_SRC) {
 
   help = ``
-  options_parser = MSSQL_SRC_OPTIONS
-  body_parser = MSSQL_SRC_BODY
 
-  sources: {[name: string]: boolean | string} = {}
+  uri = this.params[0]
+  options = this.params[1]
+  sources = this.params[2]
   db!: m.ConnectionPool
 
   async emit() {
-    var [_uri, sources] = this.body
-    var uri = `mssql://${await _uri}`
-
-    if (sources)
-      this.sources = sources
+    var uri = `mssql://${await this.uri}`
 
     var db = this.db = new m.ConnectionPool(uri)
     await db.connect()
 
-    var keys = Object.keys(sources)
-    if (keys.length === 0) {
+    var sources = [] as {name: string, query: string}[]
+
+    if (this.sources.length === 0) {
       // Get the list of all the tables if we did not know them.
       this.info('Getting table list')
       const tables = (await db.query(`
@@ -64,23 +47,28 @@ export class MssqlSource extends Source<
 
       for (let res of tables) {
         if (res === 'sysdiagrams') continue
-        sources[res.table_name] = true
+        sources.push({name: res.table_name, query: `select * FROM "${res.table_name}"`})
       }
-      keys = Object.keys(sources)
+    } else {
+      for (var src of this.sources) {
+        for (var x in src) {
+          var spec = src[x]
+          sources.push({
+            name: x,
+            query: typeof spec === 'string' ? spec : `select * from "${x}"`
+          })
+        }
+      }
     }
 
-    for (var colname of keys) {
-      var val = sources[colname]
-      this.info(`Processing ${colname}`)
+    for (var source of sources) {
+      var name = source.name
+      this.info(`Processing ${name}`)
 
-      var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
-      : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
-      : val
-
-      const result = await db.request().query(sql)
+      const result = await db.request().query(source.query)
 
       for (var s of result.recordset) {
-        await this.send(Chunk.data(colname, s))
+        await this.send(Chunk.data(name, s))
       }
     }
 
@@ -89,15 +77,6 @@ export class MssqlSource extends Source<
   }
 
 }
-
-
-
-const MSSQL_SINK_OPTIONS = s.object({
-  truncate: s.boolean(false).help`Truncate tables before loading`,
-  notice: s.boolean(true).help`Show notices on console`,
-  drop: s.boolean(false).help`Drop tables`,
-  merge: s.object({}).help`Upsert Column Name`
-})
 
 
 /**
@@ -199,14 +178,23 @@ export class MssqlTableHandler {
 }
 
 
+const MSSQL_SINK_OPTIONS = s.tuple(
+  s.string().then(r => open_tunnel(r.value)),
+  s.object({
+    truncate: s.boolean(false).help`Truncate tables before loading`,
+    notice: s.boolean(true).help`Show notices on console`,
+    drop: s.boolean(false).help`Drop tables`,
+    merge: s.object({}).help`Upsert Column Name`
+  })
+)
+
+
 @register('mssql', 'ms')
-export class MssqlSink extends Sink<
-  typeof MSSQL_SINK_OPTIONS.TYPE,
-  ParserType<typeof URI>
-> {
+export class MssqlSink extends Sink(MSSQL_SINK_OPTIONS) {
   help = `Write to a PostgreSQL Database`
-  options_parser = MSSQL_SINK_OPTIONS
-  body_parser = URI
+
+  uri = this.params[0]
+  options = this.params[1]
 
   db!: m.ConnectionPool
   transaction!: m.Transaction
@@ -216,7 +204,7 @@ export class MssqlSink extends Sink<
   stmt_nb = 0
 
   async init() {
-    const db = this.db = new m.ConnectionPool(`mssql://${await this.body}`)
+    const db = this.db = new m.ConnectionPool(`mssql://${await this.uri}`)
     await db.connect()
     var tra = this.transaction = await db.transaction()
     await tra.begin()
