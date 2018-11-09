@@ -16,10 +16,10 @@ export const bool = c.hsl(280, 60, 60)
 
 
 
-const fmt = Intl.DateTimeFormat('fr', {
+const fmt = Intl.DateTimeFormat('default', {
   hour12: false,
   year: 'numeric',
-  month: 'numeric',
+  month: '2-digit',
   day: 'numeric',
   hour: 'numeric',
   minute: 'numeric',

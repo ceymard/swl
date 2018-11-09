@@ -201,37 +201,19 @@ export class FactoryContainer {
     var parsed_rest: any = {}
 
     if (last.is(s.StringBuilder)) {
-      // parsed_rest =
+      parsed_rest = rest
     } else if (last.is(s.ObjectBuilder, s.IndexBuilder)) {
       parsed_rest = OBJECT.tryParse(rest)
     } else if (last.is(s.ArrayBuilder)) {
       parsed_rest = ARRAY_CONTENTS.tryParse(rest)
-      console.log(name, options, parsed_rest)
     }
 
     var par = tplb.from([name, options, parsed_rest])
 
     if (par.isError())
       throw new Error(`${factory.name}: ${par.errors}`)
-    // We need to parse the `rest` to further aliment the options
-
 
     var handler = new factory(par.value)
-
-    // var parsed: any = rest
-    // if (parser) {
-    //   const result = parser.parse(rest)
-    //   if (result.status) {
-    //     parsed = await result.value
-    //     handler.body = parsed
-    //   } else {
-
-    //     // const offset = result.index.offset
-    //     // const r = rest.slice(offset)
-    //     // console.log(rest)
-    //     throw new Error(`Expected ${result.expected}`)
-    //   }
-    // }
 
     return handler
   }

@@ -16,11 +16,11 @@ const MSSQL_SRC = s.tuple(
   s.array(s.indexed( // at last, the sources
     s.boolean()
     .or(s.string())
-  ))
+  ).or(s.string().then(s => { return {[s]: true}})))
 )
 
 
-@register('mssql', 'ms')
+@register('mssql')
 export class MssqlSource extends Source(MSSQL_SRC) {
 
   help = ``
@@ -31,7 +31,7 @@ export class MssqlSource extends Source(MSSQL_SRC) {
   db!: m.ConnectionPool
 
   async emit() {
-    var uri = `mssql://${await this.uri}`
+    var uri = await this.uri
 
     var db = this.db = new m.ConnectionPool(uri)
     await db.connect()
@@ -189,7 +189,7 @@ const MSSQL_SINK_OPTIONS = s.tuple(
 )
 
 
-@register('mssql', 'ms')
+@register('mssql')
 export class MssqlSink extends Sink(MSSQL_SINK_OPTIONS) {
   help = `Write to a PostgreSQL Database`
 

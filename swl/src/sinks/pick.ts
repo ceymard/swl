@@ -3,7 +3,7 @@ import * as s from 'slz'
 
 
 @register('pick')
-export class Pick extends Sink(s.array(s.object())) {
+export class Pick extends Sink(s.array(s.object().or(s.string()))) {
   help = `Pick properties from records`
 
   regexps: RegExp[] = []
