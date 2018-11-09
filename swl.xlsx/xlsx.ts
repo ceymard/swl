@@ -1,12 +1,8 @@
 import * as XLSX from 'xlsx'
 import {
   Chunk,
-  Sequence,
   make_read_creator,
   s,
-  URI,
-  OPT_OBJECT,
-  ParserType,
   Source,
   register,
   Sink
@@ -46,22 +42,24 @@ for (let i = 0; i < _l.length; i++) {
 }
 
 
-const XLS_OPTIONS = s.object({
-  header: s.string()
-})
-const XLS_SOURCE_BODY = Sequence(URI, OPT_OBJECT)
+const XLS_OPTIONS = s.tuple(
+  s.string(),
+  s.object({
+    header: s.string()
+  }),
+  s.indexed(s.boolean(true))
+)
 
 @register('xls', '.xls', '.xlsx', '.xlsb', '.xlsm', '.ods')
-export class XlsSource extends Source<
-  s.BaseType<typeof XLS_OPTIONS>,
-  ParserType<typeof XLS_SOURCE_BODY>
-> {
+export class XlsSource extends Source(XLS_OPTIONS) {
   help = `Read collections from a notebook`
-  body_parser = XLS_SOURCE_BODY
-  options_parser = XLS_OPTIONS
+
+  uri = this.params[0]
+  options = this.params[1]
+  sources = this.params[2]
 
   async emit() {
-    const files = await make_read_creator(await this.body[0], {})
+    const files = await make_read_creator(await this.uri, {})
 
     for (var file of files) {
       const b = await get_stream(file.source)
@@ -73,7 +71,7 @@ export class XlsSource extends Source<
   async handleWorkbook(w: XLSX.WorkBook) {
     for (var sname of w.SheetNames) {
       const s = w.Sheets[sname]
-      const sources = this.body[1]
+      const sources = this.sources
 
       // Find out if this sheet should be part of the extraction
       if (sources && Object.keys(sources).length > 0 && !sources[sname])
@@ -142,21 +140,21 @@ export class XlsSource extends Source<
 }
 
 
-const XLS_WRITE_OPTIONS = s.object({
-  compression: s.boolean(false)
-})
+const XLS_WRITE_OPTIONS = s.tuple(
+  s.string(),
+  s.object({
+    compression: s.boolean(false)
+  })
+)
 
 @register('xls', '.xls', '.xlsx', '.xlsb', '.xlsm', '.ods')
-export class XlsSink extends Sink<
-  s.BaseType<typeof XLS_WRITE_OPTIONS>,
-  ParserType<typeof URI>
-> {
+export class XlsSink extends Sink(XLS_WRITE_OPTIONS) {
   help = `Write collections to a workbook`
-  options_parser = XLS_WRITE_OPTIONS
-  body_parser = URI
 
   wb!: XLSX.WorkBook
   acc = [] as any[]
+
+  uri = this.params[0]
 
   async init() {
     this.wb = XLSX.utils.book_new()
@@ -177,6 +175,6 @@ export class XlsSink extends Sink<
   }
 
   async end() {
-    XLSX.writeFile(this.wb, await this.body)
+    XLSX.writeFile(this.wb, await this.uri)
   }
 }

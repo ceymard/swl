@@ -72,37 +72,44 @@ export class SqliteSource extends Source(s.tuple(
   }
 
   async emit() {
-    var sources = this.sources
-    var keys = Object.keys(sources||{})
 
-    if (keys.length === 0) {
+    var sources = [] as {name: string, query: string}[]
+    if (this.sources.length === 0) {
       // Auto-detect *tables* (not views)
       // If no sources are specified, all the tables are outputed.
       const st = this.db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`)
         .pluck<string>()
-      keys = st.all()
+      for (var table_name of st.all()) {
+        sources.push({name: table_name, query: `select * from "${table_name}"`})
+      }
+    } else {
+      for (var s of this.sources) {
+        for (var k in s) {
+          var q = s[k]
+          sources.push({
+            name: k,
+            query: typeof q === 'boolean' ? `select * from "${k}"` : q
+          })
+        }
+      }
     }
 
-    for (var colname of keys) {
-      var val = sources[colname]
+    for (var src of sources) {
+      var name = src.name
 
-      var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
-      : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
-      : val
+      var stmt = this.db.prepare(src.query)
 
-      var stmt = this.db.prepare(sql)
-
-      this.info(`Started ${colname}`)
+      this.info(`Started ${name}`)
       var iterator = (stmt as any).iterate() as IterableIterator<any>
-      for (var s of iterator) {
+      for (var it of iterator) {
         if (this.options.uncoerce) {
           var s2: any = {}
-          for (var x in s)
-            s2[x] = uncoerce(s[x])
-          s = s2
+          for (var x in it)
+            s2[x] = uncoerce(it[x])
+          it = s2
         }
 
-        await this.send(Chunk.data(colname, s))
+        await this.send(Chunk.data(name, it))
       }
     }
     this.info('done')

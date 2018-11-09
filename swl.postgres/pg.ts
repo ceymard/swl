@@ -1,34 +1,39 @@
 
-import {Chunk, s, Sink, URI, StreamWrapper, Source, ParserType, register} from 'swl'
+import {Chunk, s, Sink, StreamWrapper, Source, register, open_tunnel} from 'swl'
 import * as pg from 'pg'
 import * as _ from 'csv-stringify'
 const copy_from = require('pg-copy-streams').from
 
-const PG_SRC_OPTIONS = s.object({
-
-})
+const PG_SRC_OPTIONS = s.tuple(
+  s.string().then(s => open_tunnel(s)), // the URI
+  s.object(), // the options
+  s.array(s.indexed( // at last, the sources
+    s.boolean()
+    .or(s.string())
+  ))
+)
 
 @register('pg', 'postgres')
 export class PgSource extends Source(PG_SRC_OPTIONS) {
   help = `Read from a PostgreSQL database`
-  options_parser = PG_SRC_OPTIONS
 
-  sources: {[name: string]: boolean | string} = {}
+  // sources: {[name: string]: boolean | string} = {}
+  uri = this.params[0]
+  options = this.params[1]
+  sources = this.params[2]
+
   db!: pg.Client
 
   async emit() {
-    var [_uri, sources] = this.body
-    var uri = `postgres://${await _uri}`
-
-    if (sources)
-      this.sources = sources
+    var uri = `postgres://${await this.uri}`
 
     const db = new pg.Client(uri)
     await db.connect()
     this.db = db
 
-    var keys = Object.keys(sources)
-    if (keys.length === 0) {
+    var sources = [] as {name: string, query: string}[]
+
+    if (this.sources.length === 0) {
       // Get the list of all the tables if we did not know them.
       const tables = await db.query(`
         SELECT * FROM information_schema.tables
@@ -36,22 +41,24 @@ export class PgSource extends Source(PG_SRC_OPTIONS) {
           AND table_type = 'BASE TABLE'`)
 
       for (let res of tables.rows) {
-        sources[res.table_name] = true
+        sources.push({name: res.table_name, query: `select * from "${res.table_name}"`})
       }
-      keys = Object.keys(sources)
+    } else {
+      for (var s of this.sources) {
+        for (var k in s) {
+          var q = s[k]
+          sources.push({name: k, query: typeof q === 'boolean' ? `select * from "${k}"` : q})
+        }
+      }
     }
 
-    for (var colname of keys) {
-      var val = sources[colname]
+    for (var src of sources) {
+      var val = src.name
 
-      var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
-      : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
-      : val
+      const result = await db.query(src.query)
 
-      const result = await db.query(sql)
-
-      for (var s of result.rows) {
-        await this.send(Chunk.data(colname, s))
+      for (let row of result.rows) {
+        await this.send(Chunk.data(val, row))
       }
     }
 
@@ -65,22 +72,23 @@ export class PgSource extends Source(PG_SRC_OPTIONS) {
 
 
 
-const PG_SINK_OPTIONS = s.object({
-  truncate: s.boolean(false).default(false).help`Truncate tables before loading`,
-  notice: s.boolean(true).default(true).help`Show notices on console`,
-  drop: s.boolean(false).default(false).help`Drop tables`,
-  upsert: s.object({}).help`Upsert Column Name`
-})
-
+const PG_SINK_OPTIONS = s.tuple(
+  s.string().then(s => open_tunnel(s)),
+  s.object({
+    truncate: s.boolean(false).default(false).help`Truncate tables before loading`,
+    notice: s.boolean(true).default(true).help`Show notices on console`,
+    drop: s.boolean(false).default(false).help`Drop tables`,
+    upsert: s.object({}).help`Upsert Column Name`
+  })
+)
 
 @register('pg', 'postgres')
-export class PgSink extends Sink<
-  s.BaseType<typeof PG_SINK_OPTIONS>,
-  ParserType<typeof URI>
-> {
+export class PgSink extends Sink(PG_SINK_OPTIONS) {
+
   help = `Write to a PostgreSQL Database`
-  options_parser = PG_SINK_OPTIONS
-  body_parser = URI
+
+  uri = this.params[0]
+  options = this.params[1]
 
   wr: StreamWrapper<NodeJS.WritableStream> | null = null
   db!: pg.Client
@@ -88,7 +96,7 @@ export class PgSink extends Sink<
   columns_str!: string
 
   async init() {
-    const db = this.db = new pg.Client(`postgres://${await this.body}`)
+    const db = this.db = new pg.Client(`postgres://${await this.uri}`)
     await db.connect()
 
     if (this.options.notice) {

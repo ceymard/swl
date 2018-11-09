@@ -11,7 +11,7 @@ declare module 'mssql' {
 
 
 const MSSQL_SRC = s.tuple(
-  s.string().then(s => s.ok(open_tunnel(s.value))), // the URI
+  s.string().then(s => open_tunnel(s)), // the URI
   s.object(), // the options
   s.array(s.indexed( // at last, the sources
     s.boolean()
@@ -179,7 +179,7 @@ export class MssqlTableHandler {
 
 
 const MSSQL_SINK_OPTIONS = s.tuple(
-  s.string().then(r => open_tunnel(r.value)),
+  s.string().then(uri => open_tunnel(uri)),
   s.object({
     truncate: s.boolean(false).help`Truncate tables before loading`,
     notice: s.boolean(true).help`Show notices on console`,
