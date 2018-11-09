@@ -36,7 +36,7 @@ export class SqliteSource extends Source(s.tuple(
   s.object({uncoerce: s.boolean(false)}),
   s.array(s.indexed(
     s.boolean().or(s.string())
-  ))
+  ).or(s.string().then(s => { return {[s]: true}})))
 ))
 {
   help = `Read an SQLite database`
@@ -97,9 +97,9 @@ export class SqliteSource extends Source(s.tuple(
     for (var src of sources) {
       var name = src.name
 
+      this.info(`starting ${name} : ${src.query}`)
       var stmt = this.db.prepare(src.query)
 
-      this.info(`Started ${name}`)
       var iterator = (stmt as any).iterate() as IterableIterator<any>
       for (var it of iterator) {
         if (this.options.uncoerce) {

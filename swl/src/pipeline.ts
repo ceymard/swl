@@ -1,6 +1,6 @@
 // import { Lock } from './streams'
 import * as s from 'slz'
-import { Fragment, ADAPTER_AND_OPTIONS } from './cmdparse'
+import { Fragment, ADAPTER_AND_OPTIONS, OPT_OBJECT } from './cmdparse'
 
 export type ChunkType =
 'start'
@@ -168,7 +168,7 @@ export class FactoryContainer {
       if (match) {
         factory = this.map[match[1]]
         // in that case, we elide the protocol from the string
-        rest = `${name.replace(match[0], '')} ${rest}`
+        // rest = `${name.replace(match[0], '')} ${rest}`
       }
     }
 
@@ -177,28 +177,46 @@ export class FactoryContainer {
       // get a factory.
       const a = p.parse(name)
       factory = this.map[a.ext]
-      rest = rest ? name + ' ' + rest : name
     }
 
     if (!factory) return null
 
     // This is probably not what we want to do !!!
     var builder = factory.builder
-    var params = {} as any
 
-    if (builder.constructor === s.StringBuilder) {
-      params = rest
-    } else if (builder.constructor === s.TupleBuilder) {
-
-    } else if (builder.constructor === s.ArrayBuilder) {
-
+    if (builder.is(s.ObjectBuilder)) {
+      builder = s.tuple(s.string(), builder, s.any())
     }
 
-    var params = builder.from(options)
+    if (builder.is(s.StringBuilder, s.ArrayBuilder, s.IndexBuilder)) {
+      builder = s.tuple(s.string(), s.object(), builder)
+    }
+
+    if (!builder.is(s.TupleBuilder)) {
+      throw new Error(`${factory.name} has incorrect builder`)
+    }
+
+    var tplb = builder as s.TupleBuilder<[string, object, any]>
+    var last = tplb.builders[2]
+    var parsed_rest: any = {}
+
+    if (last.is(s.StringBuilder)) {
+      // parsed_rest =
+    } else if (last.is(s.ObjectBuilder, s.IndexBuilder)) {
+      parsed_rest = OBJECT.tryParse(rest)
+    } else if (last.is(s.ArrayBuilder)) {
+      parsed_rest = ARRAY_CONTENTS.tryParse(rest)
+      console.log(name, options, parsed_rest)
+    }
+
+    var par = tplb.from([name, options, parsed_rest])
+
+    if (par.isError())
+      throw new Error(`${factory.name}: ${par.errors}`)
     // We need to parse the `rest` to further aliment the options
 
 
-    var handler = new factory(params)
+    var handler = new factory(par.value)
 
     // var parsed: any = rest
     // if (parser) {
@@ -470,4 +488,5 @@ export function Transformer<T>(builder: s.Builder<T>) {
 }
 
 
-import { info, print_value } from './sinks/debug'
+import { info, print_value } from './sinks/debug'import { ARRAY_CONTENTS, OBJECT } from 'clion';
+

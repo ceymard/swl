@@ -1,7 +1,6 @@
 
 import * as P from 'parsimmon'
 import { OBJECT, QUOTED } from 'clion'
-import { open_tunnel } from './streams'
 
 function S(t: TemplateStringsArray) {
   return P.seqMap(P.optWhitespace, P.string(t.join('')), P.optWhitespace, (_1, res, _2) => res)
