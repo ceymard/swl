@@ -230,6 +230,7 @@ export const transformers = new FactoryContainer()
 export function register(...mimes: string[]) {
   return function (target: Factory<any>) {
     var proto = Object.getPrototypeOf(target)
+    proto = new proto
     if (proto === SourceComponent || proto instanceof SourceComponent) {
       sources.add(mimes, target)
     } else if (proto === TransformerComponent || proto instanceof TransformerComponent) {
