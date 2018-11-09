@@ -1,6 +1,7 @@
 // import { Lock } from './streams'
 import * as s from 'slz'
-import { Fragment, ADAPTER_AND_OPTIONS, OPT_OBJECT } from './cmdparse'
+import { Fragment, ADAPTER_AND_OPTIONS } from './cmdparse'
+
 
 export type ChunkType =
 'start'
@@ -119,9 +120,10 @@ export class ChunkStream {
 import * as p from 'path'
 import { Lock } from './streams';
 
-export interface Factory<T> {
-  new (p: T): PipelineComponent
-  builder: s.Builder<T>
+export interface Factory {
+  new (uri: string, options: any, args: any[]): PipelineComponent
+  options_builder: s.Builder<any>
+  args_builder: s.ArrayBuilder<any>
 }
 
 /**
@@ -129,8 +131,8 @@ export interface Factory<T> {
  * parser find them.
 */
 export class FactoryContainer {
-  map = {} as {[name: string]: Factory<any> | undefined}
-  all = [] as {component:  Factory<any>, mimes: string[]}[]
+  map = {} as {[name: string]: Factory | undefined}
+  all = [] as {component:  Factory, mimes: string[]}[]
 
   /**
    * Add a factory to the registry
@@ -138,7 +140,7 @@ export class FactoryContainer {
    * @param factory The factory function
    * @param mimes Extensions or mime types that this handler accepts
    */
-  add(mimes: string[], component: Factory<any>) {
+  add(mimes: string[], component: Factory) {
     this.all.push({component, mimes})
     for (var name of mimes) {
       this.map[name] = component
@@ -153,18 +155,18 @@ export class FactoryContainer {
 
   /**
    * Get a handler
-   * @param name The name, extension or mimetype of the handler
+   * @param uri The name, extension or mimetype of the handler
    * @param options Provided options to the factory
-   * @param rest The rest of the command line string
+   * @param args The rest of the command line string
    */
-  async get(name: string, options: any, rest: string): Promise<PipelineComponent | null> {
-    var factory = this.map[name]
+  async get(uri: string, options: any, args: any[]): Promise<PipelineComponent | null> {
+    var factory = this.map[uri]
 
     if (!factory) {
       // Try to see if we have a URI (like protocol://some_uri), in which
       // case the protocol name will be used to find the correct factory
       const re_uri = /^([\w]+):\/\//
-      const match = re_uri.exec(name)
+      const match = re_uri.exec(uri)
       if (match) {
         factory = this.map[match[1]]
         // in that case, we elide the protocol from the string
@@ -175,45 +177,23 @@ export class FactoryContainer {
     if (!factory) {
       // Try to parse a regular file path name and from its extension
       // get a factory.
-      const a = p.parse(name)
+      const a = p.parse(uri)
       factory = this.map[a.ext]
     }
 
     if (!factory) return null
 
     // This is probably not what we want to do !!!
-    var builder = factory.builder
+    var opts = factory.options_builder.from(options)
+    var arg = factory.args_builder.from(args)
 
-    if (builder.is(s.ObjectBuilder)) {
-      builder = s.tuple(s.string(), builder, s.any())
-    }
+    if (opts.isError())
+      throw new Error(`in ${factory.name} options: ${opts.errors}`)
 
-    if (builder.is(s.StringBuilder, s.ArrayBuilder, s.IndexBuilder)) {
-      builder = s.tuple(s.string(), s.object(), builder)
-    }
+    if (arg.isError())
+      throw new Error(`in ${factory.name} args: ${arg.errors}`)
 
-    if (!builder.is(s.TupleBuilder)) {
-      throw new Error(`${factory.name} has incorrect builder`)
-    }
-
-    var tplb = builder as s.TupleBuilder<[string, object, any]>
-    var last = tplb.builders[2]
-    var parsed_rest: any = {}
-
-    if (last.is(s.StringBuilder)) {
-      parsed_rest = rest
-    } else if (last.is(s.ObjectBuilder, s.IndexBuilder)) {
-      parsed_rest = OBJECT.tryParse(rest)
-    } else if (last.is(s.ArrayBuilder)) {
-      parsed_rest = ARRAY_CONTENTS.tryParse(rest)
-    }
-
-    var par = tplb.from([name, options, parsed_rest])
-
-    if (par.isError())
-      throw new Error(`${factory.name}: ${par.errors}`)
-
-    var handler = new factory(par.value)
+    var handler = new factory(uri, opts.value, arg.value)
 
     return handler
   }
@@ -228,7 +208,7 @@ export const transformers = new FactoryContainer()
  * Register a component class
  */
 export function register(...mimes: string[]) {
-  return function (target: Factory<any>) {
+  return function (target: Factory) {
     var proto = Object.getPrototypeOf(target)
     proto = new proto
     if (proto === SourceComponent || proto instanceof SourceComponent) {
@@ -297,7 +277,8 @@ export const MAX_STACK_SIZE = 8192
 export class PipelineComponent {
 
   help: string = 'No help provided by implementor'
-  static builder: s.Builder<any>
+  static options_builder: s.Builder<any>
+  static args_builder: s.ArrayBuilder<any>
 
   upstream!: ChunkStream
   stream = new ChunkStream()
@@ -441,11 +422,13 @@ export abstract class TransformerComponent extends SinkComponent {
 }
 
 
-export function Source<T>(builder: s.Builder<T>) {
+export function Source<T, U>(options: s.Builder<T>, args: s.ArrayBuilder<U>) {
   return class Src extends SourceComponent {
-    static builder = builder
 
-    constructor(public params: T) { super() }
+    static options_builder = options
+    static args_builder = args
+
+    constructor(public uri: string, public options: T, public args: U[]) { super() }
 
     async emit() {
 
@@ -453,22 +436,24 @@ export function Source<T>(builder: s.Builder<T>) {
   }
 }
 
-export function Sink<T>(builder: s.Builder<T>) {
+export function Sink<T, U>(options: s.Builder<T>, builder: s.ArrayBuilder<U>) {
+
   return class Snk extends SinkComponent {
     static builder = builder
-    constructor(public params: T) { super() }
+    constructor(public uri: string, public options: T, public args: U[]) { super() }
     builder = builder
   }
+
 }
 
-export function Transformer<T>(builder: s.Builder<T>) {
+export function Transformer<T, U>(options: s.Builder<T>, args: s.ArrayBuilder<U>) {
   return class Transformer extends TransformerComponent {
-    static builder = builder
-    constructor(public params: T) { super() }
-    builder = builder
+    static options_builder = options
+    static args_builder = args
+    constructor(public uri: string, public options: T, public args: U[]) { super() }
   }
 }
 
 
-import { info, print_value } from './sinks/debug'import { ARRAY_CONTENTS, OBJECT } from 'clion';
+import { info, print_value } from './sinks/debug'
 

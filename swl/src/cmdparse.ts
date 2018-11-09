@@ -1,6 +1,6 @@
 
 import * as P from 'parsimmon'
-import { OBJECT, QUOTED } from 'clion'
+import { OBJECT, QUOTED, ARRAY_CONTENTS } from 'clion'
 
 function S(t: TemplateStringsArray) {
   return P.seqMap(P.optWhitespace, P.string(t.join('')), P.optWhitespace, (_1, res, _2) => res)
@@ -118,9 +118,9 @@ export const ADAPTER_AND_OPTIONS = P.seqMap(
     P.seqMap(OPTS_MARKER, OBJECT, __, (_q, ob) => ob),
     __.map(_ => null)
   ),
-  P.all,
+  ARRAY_CONTENTS,
   (_1, uri, opts, rest) => {
-    return [uri, opts || {}, rest] as [string, {[name: string]: any}, string]
+    return [uri, opts || {}, rest] as [string, {[name: string]: any}, any[]]
   }
 )
 

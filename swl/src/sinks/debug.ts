@@ -63,7 +63,9 @@ const DEBUG_OPTIONS = s.object({
 
 
 @register('debug')
-export class DebugTransformer extends Transformer(s.object({data: s.boolean(), other: s.boolean()})) {
+export class DebugTransformer extends Transformer(
+  s.object({data: s.boolean(), other: s.boolean()}), s.array(s.any())
+) {
 
   help = `Print chunks to the console.
 
@@ -74,18 +76,12 @@ export class DebugTransformer extends Transformer(s.object({data: s.boolean(), o
   options_parser = DEBUG_OPTIONS
   body_parser = null
 
-  current_collection: string = ''
   nb = 0
-
-  async onCollectionStart(chunk: Chunk.Data) {
-    this.current_collection = chunk.collection
-    this.nb = 0
-  }
 
   async onData(chunk: Chunk.Data) {
     // if (this.options.data) {
       this.nb++
-      process.stderr.write(coll(`${this.current_collection}: ${this.nb} `))
+      process.stderr.write(coll(`${chunk.collection}: ${this.nb} `))
       print_value(process.stderr, chunk.payload)
       process.stderr.write('\n')
     // }
