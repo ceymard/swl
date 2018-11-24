@@ -196,10 +196,10 @@ export class PgSink extends Sink<
 
     var upsert = ""
     if (this.options.upsert) {
-      var up = (this.options.upsert as any)[table]
-      if (typeof up === 'string') {
-        upsert = ` on conflict on constraint "${up}" do update set ${this.columns.map(c => `${c} = EXCLUDED.${c}`)} `
-      }
+      var cst = (await this.db.query(`SELECT constraint_name, table_name, column_name, ordinal_position
+      FROM information_schema.key_column_usage
+      WHERE table_name = '${table}';`))
+      upsert = ` on conflict on constraint "${cst.rows[0].constraint_name}" do update set ${this.columns.map(c => `${c} = EXCLUDED.${c}`)} `
     }
 
     await this.db.query(`
