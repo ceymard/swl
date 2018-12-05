@@ -19,7 +19,7 @@ async function build_swl_file_pipeline(path: string, argv: any[], opts: any) {
         throw new Error(`in ${path}: No script argument value found for '${val}'`)
       return res
     })
-  console.log(contents)
+  // console.log(contents)
 
   try {
     const pipeline = await build_pipeline(FRAGMENTS.tryParse(contents))
