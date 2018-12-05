@@ -130,12 +130,12 @@ export class PgSink extends Sink<
     : 'text')
 
     if (this.options.drop) {
-      await this.db.query(`DROP TABLE IF EXISTS "${table}"`)
+      await this.db.query(`DROP TABLE IF EXISTS ${table}`)
     }
 
     // Create the table if it didn't exist
     await this.db.query(`
-      CREATE TABLE IF NOT EXISTS "${table}" (
+      CREATE TABLE IF NOT EXISTS ${table} (
         ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
       )
     `)
@@ -143,7 +143,7 @@ export class PgSink extends Sink<
     // Create a temporary table that will receive all the data through pg COPY
     // command
     await this.db.query(`
-      CREATE TEMP TABLE "temp_${table}" (
+      CREATE TEMP TABLE ${table.replace('.', '_')}_temp (
         ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
       )
     `)
@@ -151,17 +151,17 @@ export class PgSink extends Sink<
     this.columns_str = columns.map(c => `"${c}"`).join(', ')
 
     if (this.options.truncate) {
-      this.info(`truncating "${table}"`)
-      await this.db.query(`DELETE FROM "${table}"`)
+      this.info(`truncating ${table}`)
+      await this.db.query(`DELETE FROM ${table}`)
     }
 
-    var stream: NodeJS.WritableStream = await this.db.query(copy_from(`COPY temp_${table}(${this.columns_str}) FROM STDIN
+    var stream: NodeJS.WritableStream = await this.db.query(copy_from(`COPY ${table.replace('.', '_')}_temp(${this.columns_str}) FROM STDIN
     WITH
     DELIMITER AS ';'
     CSV HEADER
     QUOTE AS '"'
     ESCAPE AS '"'
-    NULL AS 'NULL'`)) as any
+    NULL AS '**NULL**'`)) as any
 
     var csv: NodeJS.ReadWriteStream = _({
       delimiter: ';',
@@ -175,7 +175,15 @@ export class PgSink extends Sink<
   }
 
   async onData(chunk: Chunk.Data) {
-    await this.wr!.write(chunk.payload)
+    var data = {} as any
+    var p = chunk.payload
+    for (var x in p) {
+      if (p[x] == null)
+        data[x] = '**NULL**'
+      else
+        data[x] = p[x]
+    }
+    await this.wr!.write(data)
   }
 
   async onCollectionEnd(table: string) {
@@ -186,10 +194,16 @@ export class PgSink extends Sink<
     await this.wr.close()
     this.wr = null
 
+    var schema = 'public'
+    var tbl = table
+    if (table.includes('.')) {
+      [schema, tbl] = table.split('.')
+    }
+
     const db_cols = (await this.db.query(`
     select json_object_agg(column_name, udt_name) as res
     from information_schema.columns
-    where table_name = '${table}'
+    where table_name = '${tbl}' AND table_schema = '${schema}'
     `)).rows[0].res as {[name: string]: string}
 
     const expr = this.columns.map(c => `"${c}"::${db_cols[c]}`)
@@ -197,20 +211,26 @@ export class PgSink extends Sink<
 
     var upsert = ""
     if (this.options.upsert) {
+      var schema = 'public'
+      var tbl = table
+      if (table.includes('.')) {
+        [schema, tbl] = table.split('.')
+      }
       var cst = (await this.db.query(`SELECT constraint_name, table_name, column_name, ordinal_position
       FROM information_schema.key_column_usage
-      WHERE table_name = '${table}';`))
+      WHERE table_name = '${tbl}' AND constraint_schema = '${schema}';`))
+
       upsert = ` on conflict on constraint "${cst.rows[0].constraint_name}" do update set ${this.columns.map(c => `${c} = EXCLUDED.${c}`)} `
     }
 
-    this.info(`inserting data from temp_${table}`)
+    this.info(`inserting data from ${table.replace('.', '_')}_temp`)
     await this.db.query(`
-      INSERT INTO "${table}"(${this.columns_str}) (SELECT ${expr} FROM "temp_${table}")
+      INSERT INTO ${table}(${this.columns_str}) (SELECT ${expr} FROM ${table.replace('.', '_')}_temp)
       ${upsert}
     `)
 
     await this.db.query(`
-      DROP TABLE "temp_${table}"
+      DROP TABLE ${table.replace('.', '_')}_temp
     `)
 
   }
