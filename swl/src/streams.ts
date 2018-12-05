@@ -22,8 +22,10 @@ export function *make_read_creator(uri: string, options: any) {
   }
 }
 
+var _id = 1
 
 export class Lock<T = void> {
+  public id = _id++
   private _prom: Promise<T> | null = null
   private _resolve: null | ((val: T) => void) = null
   private _reject: null | ((err: any) => void) = null

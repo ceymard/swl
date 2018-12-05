@@ -182,6 +182,7 @@ export class PgSink extends Sink<
     if (!this.wr)
       throw new Error('wr is not existing')
 
+    this.info(`closing pipe`)
     await this.wr.close()
     this.wr = null
 
@@ -202,6 +203,7 @@ export class PgSink extends Sink<
       upsert = ` on conflict on constraint "${cst.rows[0].constraint_name}" do update set ${this.columns.map(c => `${c} = EXCLUDED.${c}`)} `
     }
 
+    this.info(`inserting data from temp_${table}`)
     await this.db.query(`
       INSERT INTO "${table}"(${this.columns_str}) (SELECT ${expr} FROM "temp_${table}")
       ${upsert}

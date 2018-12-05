@@ -59,6 +59,8 @@ export class ChunkStream {
   send_lock = new Lock
   fetch_lock = new Lock
 
+  constructor(public name: string) { }
+
   async send(chunk: Chunk | null) {
     if (this.finished) throw new Error(`Finished stream can't be written unto`)
 
@@ -231,7 +233,7 @@ export function register(...mimes: string[]) {
 export function instantiate_pipeline(components: PipelineComponent<any, any>[], initial?: ChunkStream) {
 
   if (!initial) {
-    initial = new ChunkStream()
+    initial = new ChunkStream('Initial')
     initial.send(null)
   }
 
@@ -285,7 +287,7 @@ export abstract class PipelineComponent<O, B> {
   body!: B
 
   upstream!: ChunkStream
-  stream = new ChunkStream()
+  stream = new ChunkStream(this.constructor.name)
 
   /**
    * Send chunks down the pipeline
@@ -350,7 +352,7 @@ export abstract class PipelineComponent<O, B> {
 
   async forward(stream: ChunkStream) {
     var next: Chunk | Promise<any> | null
-    while (next = await this.upstream.next()) {
+    while (next = await stream.next()) {
       await this.send(next)
     }
   }
