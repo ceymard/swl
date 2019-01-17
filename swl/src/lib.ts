@@ -1,4 +1,6 @@
-if (process.env.DEBUG) require('source-map-support').install()
+if (process.env.DEBUG) require('source-map-support').install();
+
+(Symbol.asyncIterator as any) = Symbol.asyncIterator || Symbol('async-iterator')
 
 Date.prototype.toString = function toString(this: Date) {
   // Why oh why does Date have a default toString that is so useless ?

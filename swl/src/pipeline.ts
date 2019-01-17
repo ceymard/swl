@@ -337,6 +337,8 @@ export abstract class PipelineComponent<O, B> {
       } catch (e2) {
         console.error('error in error()', e2.stack)
       }
+      this.stream
+      // shouldn't this error be reported to upstream ?
       throw e
     } finally {
       await this.final()

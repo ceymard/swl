@@ -93,8 +93,9 @@ export class PgSink extends Sink<
   columns_str!: string
 
   async init() {
-    const db = this.db = new pg.Client(`postgres://${await this.body}`)
+    const db = new pg.Client(`postgres://${await this.body}`)
     await db.connect()
+    this.db = db
 
     if (this.options.notice) {
       db.on('notice', (notice: Error) => {
@@ -117,8 +118,11 @@ export class PgSink extends Sink<
   }
 
   async error(err: any) {
-    await this.db.query('ROLLBACK')
-    throw err
+    try {
+      if (this.db) await this.db.query('ROLLBACK')
+    } finally {
+      throw err
+    }
   }
 
   async onCollectionStart(chunk: Chunk.Data) {
@@ -178,7 +182,7 @@ export class PgSink extends Sink<
     var data = {} as any
     var p = chunk.payload
     for (var x in p) {
-      if (p[x] == null)
+      if (p[x] === null)
         data[x] = '**NULL**'
       else
         data[x] = p[x]
@@ -224,6 +228,7 @@ export class PgSink extends Sink<
     }
 
     this.info(`inserting data from ${table.replace('.', '_')}_temp`)
+
     await this.db.query(`
       INSERT INTO ${table}(${this.columns_str}) (SELECT ${expr} FROM ${table.replace('.', '_')}_temp)
       ${upsert}

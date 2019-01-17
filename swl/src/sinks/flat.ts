@@ -26,6 +26,7 @@ export class UnFlatten extends Transformer<{}, []> {
   // FIXME we should make a suitable options_parser for Flatten
 
   async onData(chunk: Chunk.Data) {
+    const p = chunk.payload
     await this.send(Chunk.data(chunk.collection, u(chunk.payload, this.options)))
   }
 }
