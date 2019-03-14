@@ -148,7 +148,8 @@ export class PgSink extends Sink<
     // command
     await this.db.query(`
       CREATE TEMP TABLE ${table.replace('.', '_')}_temp (
-        ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
+--//        ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
+        ${columns.map((c, i) => `"${c}" TEXT`).join(', ')}
       )
     `)
 
@@ -229,14 +230,47 @@ export class PgSink extends Sink<
 
     this.info(`inserting data from ${table.replace('.', '_')}_temp`)
 
+    // Insert data from temp table into final table
     await this.db.query(`
       INSERT INTO ${table}(${this.columns_str}) (SELECT ${expr} FROM ${table.replace('.', '_')}_temp)
       ${upsert}
     `)
 
+    // Drop the temporary table
     await this.db.query(`
       DROP TABLE ${table.replace('.', '_')}_temp
     `)
+
+    // Reset sequences if needed
+    const seq_res = await this.db.query(/* sql */`
+      SELECT
+        column_name as name,
+        regexp_replace(
+          regexp_replace(column_default, '[^'']+''', ''),
+          '''.*',
+          ''
+        ) as seq
+      FROM information_schema.columns
+      WHERE table_name = '${tbl}'
+        AND table_schema = '${schema}'
+        AND column_default like '%nextval(%'
+    `)
+
+    const sequences = seq_res.rows as {name: string, seq: string}[]
+
+    for (var seq of sequences) {
+      this.info(`Resetting sequence ${seq.seq}`)
+      await this.db.query(/* sql */`
+        DO $$
+        DECLARE
+          themax INT;
+        BEGIN
+          SELECT MAX(${seq.name}) INTO themax FROM ${table};
+          PERFORM SETVAL('${seq.seq}', COALESCE(themax, 1), false);
+        END
+        $$ LANGUAGE plpgsql;
+      `)
+    }
 
   }
 }
