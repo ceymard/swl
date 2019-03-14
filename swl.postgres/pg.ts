@@ -267,7 +267,7 @@ export class PgSink extends Sink<
         BEGIN
           LOCK TABLE ${table} IN EXCLUSIVE MODE;
           SELECT MAX(${seq.name}) INTO themax FROM ${table};
-          PERFORM SETVAL('${seq.seq}', COALESCE(themax, 1), false);
+          PERFORM SETVAL('${seq.seq}', COALESCE(themax + 1, 1), false);
         END
         $$ LANGUAGE plpgsql;
       `)
