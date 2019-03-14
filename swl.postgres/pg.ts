@@ -130,8 +130,10 @@ export class PgSink extends Sink<
     var table = chunk.collection
     const columns = this.columns = Object.keys(payload)
     var types = columns.map(c => typeof payload[c] === 'number' ? 'real'
+    : payload[c] instanceof Date ? 'timestamptz'
     : payload[c] instanceof Buffer ? 'blob'
     : 'text')
+    // console.log(types)
 
     if (this.options.drop) {
       await this.db.query(`DROP TABLE IF EXISTS ${table}`)
@@ -183,10 +185,13 @@ export class PgSink extends Sink<
     var data = {} as any
     var p = chunk.payload
     for (var x in p) {
-      if (p[x] === null)
+      const val = p[x]
+      if (val === null)
         data[x] = '**NULL**'
+      else if (val instanceof Date)
+        data[x] = val!.toUTCString()
       else
-        data[x] = p[x]
+        data[x] = val
     }
     await this.wr!.write(data)
   }
@@ -212,7 +217,8 @@ export class PgSink extends Sink<
     `)).rows[0].res as {[name: string]: string}
 
     const expr = this.columns.map(c => `"${c}"::${db_cols[c]}`)
-    .join(', ')
+    .join(', ') // .replace(/timestamp(tz)?/g, 'long::abstime')
+    // this.info(expr)
 
     var upsert = ""
     if (this.options.upsert) {
