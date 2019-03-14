@@ -265,6 +265,7 @@ export class PgSink extends Sink<
         DECLARE
           themax INT;
         BEGIN
+          LOCK TABLE ${table} IN EXCLUSIVE MODE;
           SELECT MAX(${seq.name}) INTO themax FROM ${table};
           PERFORM SETVAL('${seq.seq}', COALESCE(themax, 1), false);
         END
