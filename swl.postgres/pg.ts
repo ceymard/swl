@@ -229,8 +229,9 @@ export class PgSink extends Sink<
       }
       var cst = (await this.db.query(`SELECT constraint_name, table_name, column_name, ordinal_position
       FROM information_schema.key_column_usage
-      WHERE table_name = '${tbl}' AND constraint_schema = '${schema}';`))
+      WHERE table_name = '${tbl}' AND constraint_schema = '${schema}' AND constraint_name LIKE '%_pkey';`))
 
+      // console.log(cst.rows)
       upsert = ` on conflict on constraint "${cst.rows[0].constraint_name}" do update set ${this.columns.map(c => `${c} = EXCLUDED.${c}`)} `
     }
 
