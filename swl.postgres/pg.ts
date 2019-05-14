@@ -5,7 +5,7 @@ import * as _ from 'csv-stringify'
 const copy_from = require('pg-copy-streams').from
 
 const PG_SRC_OPTIONS = s.object({
-
+  schema: s.string('public')
 })
 const PG_SRC_BODY = Sequence(URI, OPT_OBJECT)
 
@@ -37,11 +37,11 @@ export class PgSource extends Source<
       // Get the list of all the tables if we did not know them.
       const tables = await db.query(`
         SELECT * FROM information_schema.tables
-        WHERE table_schema = 'public'
+        WHERE table_schema = '${this.options.schema}'
           AND table_type = 'BASE TABLE'`)
 
       for (let res of tables.rows) {
-        sources[res.table_name] = true
+        sources[this.options.schema + '.' + res.table_name] = true
       }
       keys = Object.keys(sources)
     }
@@ -49,8 +49,8 @@ export class PgSource extends Source<
     for (var colname of keys) {
       var val = sources[colname]
 
-      var sql = typeof val !== 'string' ? `SELECT * FROM "${colname}"`
-      : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val}"`
+      var sql = typeof val !== 'string' ? `SELECT * FROM "${colname.replace('.', '"."')}"`
+      : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val.replace('.', '"."')}"`
       : val
 
       const result = await db.query(sql)
