@@ -231,8 +231,7 @@ export class PgSink extends Sink<
       FROM information_schema.key_column_usage
       WHERE table_name = '${tbl}' AND constraint_schema = '${schema}' AND constraint_name LIKE '%_pkey';`))
 
-      // console.log(cst.rows)
-      upsert = ` on conflict on constraint "${cst.rows[0].constraint_name}" do update set ${this.columns.map(c => `${c} = EXCLUDED.${c}`)} `
+      upsert = ` ON CONFLICT ON CONSTRAINT "${cst.rows[0].constraint_name}" DO UPDATE SET ${this.columns.map(c => `"${c}" = EXCLUDED."${c}"`)} `
     }
 
     this.info(`inserting data from ${table.replace('.', '_')}_temp`)
