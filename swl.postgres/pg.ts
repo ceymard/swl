@@ -4,6 +4,14 @@ import * as pg from 'pg'
 import * as _ from 'csv-stringify'
 const copy_from = require('pg-copy-streams').from
 
+
+var types = pg.types
+// Data type !
+types.setTypeParser(1082, val => {
+  // var d = new Date(val)
+  return val
+})
+
 const PG_SRC_OPTIONS = s.object({
   schema: s.string('public')
 })
@@ -34,16 +42,51 @@ export class PgSource extends Source<
 
     var keys = Object.keys(sources)
     if (keys.length === 0) {
-      // Get the list of all the tables if we did not know them.
-      const tables = await db.query(`
-        SELECT * FROM information_schema.tables
-        WHERE table_schema = '${this.options.schema}'
-          AND table_type = 'BASE TABLE'`)
+      const tbls = await db.query(`
+      WITH cons AS (SELECT
+        tc.table_schema,
+        tc.constraint_name,
+        tc.table_name,
+        kcu.column_name,
+        ccu.table_schema AS foreign_table_schema,
+        ccu.table_name AS foreign_table_name,
+        ccu.column_name AS foreign_column_name
+      FROM
+          information_schema.table_constraints AS tc
+          JOIN information_schema.key_column_usage AS kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+          JOIN information_schema.constraint_column_usage AS ccu
+            ON ccu.constraint_name = tc.constraint_name
+            AND ccu.table_schema = tc.table_schema
+      WHERE tc.constraint_type = 'FOREIGN KEY'),
+          tbls AS (SELECT tbl.table_schema as "schema", tbl.table_schema || '.' || tbl.table_name as tbl, cons.foreign_table_schema || '.' || cons.foreign_table_name as dep FROM
+          "information_schema"."tables" tbl
+          LEFT JOIN cons ON cons.table_name = tbl.table_name AND cons.table_schema = tbl.table_schema
+      where tbl.table_schema = '${this.options.schema}' AND tbl.table_type = 'BASE TABLE')
+      SELECT t.tbl, COALESCE(array_agg(t.dep) FILTER (WHERE t.dep IS NOT NULL), '{}'::text[]) as deps
+      FROM tbls t
+      GROUP BY t.tbl
+      `)
 
-      for (let res of tables.rows) {
-        sources[this.options.schema + '.' + res.table_name] = true
+      const dct = {} as {[name: string]: string[]}
+      for (let r of tbls.rows) {
+        dct[r.tbl] = r.deps
       }
-      keys = Object.keys(sources)
+
+      const tables_set = new Set<string>()
+      const add_deps = (tbl: string) => {
+        for (var t of dct[tbl]) {
+          if (!tables_set.has(t))
+            add_deps(t)
+        }
+        tables_set.add(tbl)
+      }
+
+      for (var tblname in dct) {
+        add_deps(tblname)
+      }
+      keys = Array.from(tables_set)
     }
 
     for (var colname of keys) {
@@ -56,7 +99,7 @@ export class PgSource extends Source<
       const result = await db.query(sql)
 
       for (var s of result.rows) {
-        console.log(s)
+        // console.log(s)
         await this.send(Chunk.data(colname, s))
       }
     }
@@ -191,8 +234,10 @@ export class PgSink extends Sink<
         data[x] = '**NULL**'
       else if (val instanceof Date)
         data[x] = val!.toUTCString()
+      else if (val instanceof Array)
+        data[x] = '{' + val.join(',') + '}'
       else
-        data[x] = val
+        data[x] = val.toString()
     }
     await this.wr!.write(data)
   }
