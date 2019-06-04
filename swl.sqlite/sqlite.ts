@@ -272,7 +272,7 @@ export function coerce(value: any) {
     return null
 
   if (value instanceof Date) {
-    return value.toISOString()
+    return (new Date(value.valueOf() - (value.getTimezoneOffset() * 60000))).toISOString()
   } if (Array.isArray(value))
     return value.join(', ')
 

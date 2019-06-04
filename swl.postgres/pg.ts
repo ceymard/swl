@@ -56,6 +56,7 @@ export class PgSource extends Source<
       const result = await db.query(sql)
 
       for (var s of result.rows) {
+        console.log(s)
         await this.send(Chunk.data(colname, s))
       }
     }
