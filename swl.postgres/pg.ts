@@ -118,7 +118,8 @@ const PG_SINK_OPTIONS = s.object({
   truncate: s.boolean(false).default(false).help`Truncate tables before loading`,
   notice: s.boolean(true).default(true).help`Show notices on console`,
   drop: s.boolean(false).default(false).help`Drop tables`,
-  upsert: s.object({}).help`Upsert Column Name`
+  upsert: s.object({}).help`Upsert Column Name`,
+  disable_triggers: s.boolean(false)
 })
 
 
@@ -147,6 +148,9 @@ export class PgSink extends Sink<
         this.info(`pg ${_.severity}: ${_.message}`)
       })
     }
+
+    if (this.options.disable_triggers)
+      await db.query(`SET session_replication_role = replica;`)
 
     await db.query('BEGIN')
   }
@@ -177,7 +181,7 @@ export class PgSink extends Sink<
     : payload[c] instanceof Date ? 'timestamptz'
     : payload[c] instanceof Buffer ? 'blob'
     : 'text')
-    // console.log(types)
+    // console.log(chunk.collection, types)
 
     if (this.options.drop) {
       await this.db.query(`DROP TABLE IF EXISTS ${table}`)
@@ -194,8 +198,7 @@ export class PgSink extends Sink<
     // command
     await this.db.query(`
       CREATE TEMP TABLE ${table.replace('.', '_')}_temp (
---//        ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
-        ${columns.map((c, i) => `"${c}" TEXT`).join(', ')}
+        ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
       )
     `)
 
@@ -283,6 +286,7 @@ export class PgSink extends Sink<
     this.info(`inserting data from ${table.replace('.', '_')}_temp`)
 
     // Insert data from temp table into final table
+    // console.log(a.length)
     await this.db.query(`
       INSERT INTO ${table}(${this.columns_str}) (SELECT ${expr} FROM ${table.replace('.', '_')}_temp)
       ${upsert}
