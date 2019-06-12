@@ -77,7 +77,7 @@ export class PgSource extends Source<
       const tables_set = new Set<string>()
       const add_deps = (tbl: string) => {
         for (var t of dct[tbl]) {
-          if (!tables_set.has(t))
+          if (!tables_set.has(t) && t !== tbl)
             add_deps(t)
         }
         tables_set.add(tbl)
