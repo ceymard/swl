@@ -22,7 +22,7 @@ function try_require(...names: string[]) {
 }
 
 try_require(
-  // 'swl.json',
+  'swl.json',
   'swl.csv',
   // 'swl.yaml',
   'swl.postgres',

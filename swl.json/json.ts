@@ -1,5 +1,5 @@
-
-import {Chunk, Source, register} from 'swl'
+import * as fs from 'fs'
+import {Chunk, Source, register, URI, Sequence, ParserType, Sink} from 'swl'
 
 
 @register('inline')
@@ -18,6 +18,60 @@ export class InlineJson extends Source<
       await this.send(Chunk.data('json', c))
     }
   }
+}
+
+const JSON_BODY = Sequence(URI).name`Json Options`
+
+@register('json', '.json')
+export class JsonSource extends Source<{}, ParserType<typeof JSON_BODY>> {
+
+  help = 'Json file'
+  options_parser = null
+  body_parser = JSON_BODY
+
+  async emit() {
+    const fname = await this.body[0]
+    const contents = await fs.readFileSync(fname, {encoding: 'utf-8'}).replace(/^[^\{\[]+/, '')
+    const parsed = JSON.parse(contents)
+    const arr = Array.isArray(parsed) ? parsed : [parsed]
+    const col = fname.replace(/\.json$/, '')
+
+    for (var a of arr) {
+      this.send(Chunk.data(col, a))
+    }
+  }
+
+}
+
+
+@register('json', '.json')
+export class JsonSink extends Sink<{}, ParserType<typeof JSON_BODY>> {
+
+  help = 'Json file'
+  options_parser = null
+  body_parser = JSON_BODY
+
+  the_file!: fs.WriteStream
+  first = true
+
+  async onCollectionStart(chk: Chunk.Data) {
+    this.the_file = fs.createWriteStream((await this.body[0]), {encoding: 'utf-8'})
+    this.the_file.write('[\n')
+  }
+
+  async onData(chk: Chunk.Data) {
+    if (this.first) {
+      this.first = false
+    } else {
+      this.the_file.write(',\n')
+    }
+    this.the_file.write(JSON.stringify(chk.payload, null, 2))
+  }
+
+  async onCollectionEnd() {
+    this.the_file.write('\n]')
+  }
+
 }
 
 

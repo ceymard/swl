@@ -190,6 +190,8 @@ export class FactoryContainer {
         // console.log(rest)
         throw new Error(`Expected ${result.expected}`)
       }
+    } else {
+      handler.body = rest
     }
 
     if (Array.isArray(parsed)) {

@@ -16,7 +16,10 @@ export class Js extends Transformer<{}, string> {
   current_collection = ''
 
   async init() {
-    this.fn = eval(this.body)
+    var bod = this.body.trim()
+    if (bod[0] === '\'' || bod[0] === '"')
+      bod = bod.slice(1, -1)
+    this.fn = eval(bod)
   }
 
   async onCollectionStart(chk: Chunk.Data) {
@@ -26,6 +29,8 @@ export class Js extends Transformer<{}, string> {
 
   async onData(chk: Chunk.Data) {
     var res = this.fn(chk.payload, this.current_collection, this.nb++) as any
+    if (!res) return
+
     if (res[Symbol.iterator]) {
       for (var r of res)
         await this.send(Chunk.data(chk.collection, r))

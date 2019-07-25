@@ -239,6 +239,8 @@ export class PgSink extends Sink<
         data[x] = val!.toUTCString()
       else if (val instanceof Array)
         data[x] = '{' + val.join(',') + '}'
+      else if (val.constructor === Object)
+        data[x] = JSON.stringify(val)
       else
         data[x] = val.toString()
     }
@@ -286,7 +288,8 @@ export class PgSink extends Sink<
     this.info(`inserting data from ${table.replace('.', '_')}_temp`)
 
     // Insert data from temp table into final table
-    // console.log(a.length)
+    // console.log((await this.db.query(`SELECT * FROM ${table.replace('.', '_')}_temp`)).rows)
+
     await this.db.query(`
       INSERT INTO ${table}(${this.columns_str}) (SELECT ${expr} FROM ${table.replace('.', '_')}_temp)
       ${upsert}
