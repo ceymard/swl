@@ -8,6 +8,6 @@
     "build": "wtsc"
   },
   "dependencies": {
-    "xlsx": "^0.12.3"
+    "xlsx": "^0.12.13"
   }
 }

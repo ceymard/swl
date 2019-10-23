@@ -198,7 +198,8 @@ export class PgSink extends Sink<
     // command
     await this.db.query(`
       CREATE TEMP TABLE ${table.replace('.', '_')}_temp (
-        ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
+        -- ${columns.map((c, i) => `"${c}" ${types[i]}`).join(', ')}
+        ${columns.map((c, i) => `"${c}" TEXT`).join(', ')}
       )
     `)
 
