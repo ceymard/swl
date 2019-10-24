@@ -76,7 +76,10 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
   drained = new Lock()
 
   constructor(public stream: T, public collection?: string) {
-    stream.on('readable', e => this.readable.resolve())
+    // FIXME - should check if stream isn't writable to be sure
+    // stream.on('readable', e => {
+    //   this.readable.resolve()
+    // })
     stream.on('end', e => {
       this._ended = true
       this.ended.resolve()
@@ -86,6 +89,7 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
       this.drained.resolve()
     })
     stream.on('error', e => {
+      console.error(e)
       this.ended.reject(e)
       this.readable.reject(e)
       this.drained.reject(e)
@@ -115,14 +119,14 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
    * Write data to the streama
    */
   async write<U extends NodeJS.WritableStream>(this: StreamWrapper<U>, data: any) {
-
     if (this.should_drain) {
       await this.drained.promise
       this.should_drain = false
     }
 
-    if (!this.stream.write(data))
+    if (!this.stream.write(data)) {
       this.should_drain = true
+    }
   }
 
   async close<U extends NodeJS.WritableStream>(this: StreamWrapper<U>) {
