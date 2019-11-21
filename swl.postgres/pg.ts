@@ -3,7 +3,7 @@ import {Sequence, Chunk, s, Sink, URI, OPT_OBJECT, StreamWrapper, Source, Parser
 import * as pg from 'pg'
 import * as _ from 'csv-stringify'
 const copy_from = require('pg-copy-streams').from
-
+import * as st from 'stream'
 
 var types = pg.types
 // Data type !
@@ -42,7 +42,7 @@ export class PgSource extends Source<
 
     var keys = Object.keys(sources)
     if (keys.length === 0) {
-      const tbls = await db.query(`
+      const tbls = await db.query(/* sql */`
       WITH cons AS (SELECT
         tc.table_schema,
         tc.constraint_name,
@@ -92,8 +92,8 @@ export class PgSource extends Source<
     for (var colname of keys) {
       var val = sources[colname]
 
-      var sql = typeof val !== 'string' ? `SELECT * FROM "${colname.replace('.', '"."')}"`
-      : !val.trim().toLowerCase().startsWith('select') ? `SELECT * FROM "${val.replace('.', '"."')}"`
+      var sql = typeof val !== 'string' ? /* sql*/ `SELECT * FROM "${colname.replace('.', '"."')}"`
+      : !val.trim().toLowerCase().startsWith('select') ? /*sql */`SELECT * FROM "${val.replace('.', '"."')}"`
       : val
 
       const result = await db.query(sql)
@@ -225,11 +225,22 @@ export class PgSink extends Sink<
       // escape: true
     })
 
+    const tr = new st.Transform({
+      transform: (chunk, enc, callbak) => {
+        console.log(chunk)
+        callbak(chunk)
+      }
+    })
     csv.pipe(stream)
+    // tr.on('data', e => console.log('pouet'))
+    // csv.write({zob: 1, sds: 2, dfdf:2})
+
+    // console.log(stream.writable)
     this.wr = new StreamWrapper(csv)
   }
 
   async onData(chunk: Chunk.Data) {
+    // console.log(chunk)
     var data = {} as any
     var p = chunk.payload
     for (var x in p) {
@@ -252,7 +263,7 @@ export class PgSink extends Sink<
     if (!this.wr)
       throw new Error('wr is not existing')
 
-    this.info(`closing pipe`)
+    this.info(`closing pipe!`)
     await this.wr.close()
     this.wr = null
 
@@ -262,7 +273,7 @@ export class PgSink extends Sink<
       [schema, tbl] = table.split('.')
     }
 
-    const db_cols = (await this.db.query(`
+    const db_cols = (await this.db.query(/* sql */`
     select json_object_agg(column_name, udt_name) as res
     from information_schema.columns
     where table_name = '${tbl}' AND table_schema = '${schema}'
@@ -279,9 +290,17 @@ export class PgSink extends Sink<
       if (table.includes('.')) {
         [schema, tbl] = table.split('.')
       }
-      var cst = (await this.db.query(`SELECT constraint_name, table_name, column_name, ordinal_position
-      FROM information_schema.key_column_usage
-      WHERE table_name = '${tbl}' AND constraint_schema = '${schema}' AND constraint_name LIKE '%_pkey';`))
+      // var cst = (await this.db.query(/* sql */`SELECT constraint_name, table_name, column_name, ordinal_position
+      // FROM information_schema.key_column_usage
+      // WHERE table_name = '${tbl}' AND constraint_schema = '${schema}' AND constraint_name LIKE '%_pkey';`))
+      var cst = (await this.db.query(/* sql */`
+        SELECT
+          constraint_name
+        FROM information_schema.table_constraints
+        WHERE table_name = '${tbl}' AND constraint_schema = '${schema}'
+          AND (constraint_type = 'PRIMARY KEY' OR constraint_type = 'UNIQUE')
+        ORDER BY constraint_type
+        `))
 
       upsert = ` ON CONFLICT ON CONSTRAINT "${cst.rows[0].constraint_name}" DO UPDATE SET ${this.columns.map(c => `"${c}" = EXCLUDED."${c}"`)} `
     }

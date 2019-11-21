@@ -8,8 +8,8 @@
     "build": "wtsc"
   },
   "dependencies": {
-    "pg": "^7.4.1",
-    "pg-copy-streams": "^1.2.0"
+    "pg": "^7.12.1",
+    "pg-copy-streams": "^2.2.2"
   },
   "devDependencies": {
     "@types/pg": "^7.4.4"
