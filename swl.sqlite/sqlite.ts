@@ -240,6 +240,7 @@ export class SqliteSink extends Sink<
 
 
 const re_date = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?:\d{2}(?:\.\d{3}Z?)))?$/
+const re_number = /^\d+(\.\d+)?$/
 const re_boolean = /^true|false$/i
 
 export function uncoerce(value: any) {
@@ -255,6 +256,10 @@ export function uncoerce(value: any) {
 
     if (trimmed.match(re_boolean)) {
       return trimmed.toLowerCase() === 'true'
+    }
+
+    if (trimmed.match(re_number)) {
+      return parseFloat(trimmed)
     }
 
     if (trimmed === 'null')
