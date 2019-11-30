@@ -25,7 +25,7 @@
     "@types/flat": "^0.0.28",
     "@types/get-port": "^3.2.0",
     "@types/marked": "^0.3.0",
-    "@types/node": "^9.4.6",
+    "@types/node": "^12.12.14",
     "@types/ramda": "^0.25.29",
     "@types/yup": "^0.24.1",
     "flat": "^4.0.0"

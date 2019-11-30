@@ -244,8 +244,13 @@ const re_number = /^\d+(\.\d+)?$/
 const re_boolean = /^true|false$/i
 
 export function uncoerce(value: any) {
-  if (value && (value[0] === '{' || value[0] === '['))
-    return JSON.parse(value)
+  if (value && (value[0] === '{' || value[0] === '[')) {
+    try {
+      return JSON.parse(value)
+    } catch (e) {
+      return value
+    }
+  }
 
   if (typeof value === 'string') {
     var trimmed = value.trim().toLowerCase()
