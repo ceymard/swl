@@ -34,7 +34,7 @@ export class PgSource extends Source<
     var uri = `postgres://${await _uri}`
 
     if (sources)
-      this.sources = sources
+    this.sources = sources
 
     const db = new pg.Client(uri)
     await db.connect()

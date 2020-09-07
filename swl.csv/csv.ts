@@ -7,7 +7,8 @@ const parse = require('csv-parser')
 const CSV_SOURCE_OPTIONS = s.object({
   columns: s.boolean(true).help `The first row are columns`,
   separator: s.string(';'),
-  auto_parse: s.boolean(true)
+  auto_parse: s.boolean(true),
+  name: s.string('')
 })
 
 @register('csv', '.csv')
@@ -25,7 +26,7 @@ export class CsvSource extends Source<
   }
 
   async emit() {
-    const sources = await make_read_creator(await this.body[0], this.body[1] || {})
+    const sources = await make_read_creator(await this.body[0], this.body[1] || {}, this.options.name || undefined)
 
     for await (var src of sources) {
       const stream = new StreamWrapper(src.source.pipe(parse(this.options)))

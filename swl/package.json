@@ -7,8 +7,8 @@
   "main": "./lib/lib.js",
   "types": "./lib/lib.d.ts",
   "scripts": {
-    "watch": "wtsc -w",
-    "build": "wtsc"
+    "watch": "tsc -w | wtsc",
+    "build": "tsc | wtsc"
   },
   "dependencies": {
     "chalk": "^2.3.1",

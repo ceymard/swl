@@ -14,10 +14,10 @@ export async function make_write_creator(uri: string, options: any) {
 
 import * as path from 'path'
 
-export function *make_read_creator(uri: string, options: any) {
+export function *make_read_creator(uri: string, options: any, colname?: string) {
   // Check for protocol !!
   yield {
-    collection: path.basename(uri).replace(/\.[^\.]+$/, ''),
+    collection: colname ?? path.basename(uri).replace(/\.[^\.]+$/, ''),
     source: createReadStream(uri, options) as NodeJS.ReadableStream
   }
 }
