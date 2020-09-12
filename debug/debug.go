@@ -61,10 +61,13 @@ func (d *DebugSink) OnEnd() error {
 
 func pretty(v interface{}) {
 	switch v.(type) {
+	case nil:
+		coNull.Print("null")
+	case float32, float64, int, int16, int32, int64, int8:
+		coNum.Print(v)
+
 	case []interface{}:
 
-	case int:
-		coNum.Print(v)
 	case string:
 		coString.Print(`"`, v, `"`)
 	case swllib.Data:

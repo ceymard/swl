@@ -10,7 +10,82 @@ import (
 	"github.com/ceymard/swl/debug"
 	"github.com/ceymard/swl/swllib"
 	"github.com/ceymard/swl/tester"
+
+	swlite "github.com/ceymard/swl/sqlite"
 )
+
+func main() {
+	// Sources
+	swllib.RegisterSource("tester", "sends test data", tester.TesterSourceCreator)
+	swllib.RegisterSource("sqlite", "sqlite handler", swlite.SqliteSourceCreator)
+
+	// Sinks
+	swllib.RegisterSink("debug", "prints chunks to the console", debug.DebugSinkCreator)
+
+	// We're gonna split the args into different commands
+	var (
+		// args       = os.Args[1:]
+		err        error
+		nbcommands int
+		wg         sync.WaitGroup
+		commands   []CommandBlock
+	)
+
+	//// FOR TEST PURPOSES
+	if commands, err = parseArgs(); err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
+	// pp.Print(commands)
+	// pp.Print(args)
+	// commands = []CommandBlock{
+	// 	{source: true, args: []string{}, srcCreator: tester.TesterSourceCreator},
+	// 	{source: false, args: []string{}, sinkCreator: debug.DebugSinkCreator},
+	// }
+
+	/////////////////////
+	nbcommands = len(commands)
+	wg.Add(nbcommands)
+
+	channels := make([]*swllib.Channel, nbcommands)
+	for i := 0; i < nbcommands; i++ {
+		channels[i] = swllib.NewChannel(8192)
+	}
+
+	pipes := make([]*swllib.Pipe, nbcommands)
+	for i := 0; i < nbcommands; i++ {
+		var prev_pipe *swllib.Pipe = nil
+		if i > 0 {
+			prev_pipe = pipes[i-1]
+		}
+		pipes[i] = swllib.NewPipe(prev_pipe, channels[i])
+	}
+
+	for i := 0; i < nbcommands; i++ {
+		var cmd = commands[i]
+		if cmd.IsSource {
+			if err := swllib.RunSource(&wg, pipes[i], cmd.Name, cmd.Args, cmd.SrcCreator); err != nil {
+				log.Print(err)
+				os.Exit(1)
+			}
+		} else {
+			if err = swllib.RunSink(&wg, pipes[i], cmd.Name, cmd.Args, cmd.SinkCreator); err != nil {
+				log.Print(err)
+				os.Exit(1)
+			}
+		}
+	}
+
+	wg.Wait()
+}
+
+type CommandBlock struct {
+	IsSource    bool
+	Name        string
+	Args        []string
+	SrcCreator  swllib.SourceCreator
+	SinkCreator swllib.SinkCreator
+}
 
 func parseArgs() ([]CommandBlock, error) {
 	var (
@@ -69,76 +144,4 @@ func parseArgs() ([]CommandBlock, error) {
 	}
 
 	return res, nil
-}
-
-func main() {
-	// Sources
-	swllib.RegisterSource("tester", "sends test data", tester.TesterSourceCreator)
-
-	// Sinks
-	swllib.RegisterSink("debug", "prints chunks to the console", debug.DebugSinkCreator)
-
-	// We're gonna split the args into different commands
-	var (
-		// args       = os.Args[1:]
-		err        error
-		nbcommands int
-		wg         sync.WaitGroup
-		commands   []CommandBlock
-	)
-
-	//// FOR TEST PURPOSES
-	if commands, err = parseArgs(); err != nil {
-		log.Print(err)
-		os.Exit(1)
-	}
-	// pp.Print(commands)
-	// pp.Print(args)
-	// commands = []CommandBlock{
-	// 	{source: true, args: []string{}, srcCreator: tester.TesterSourceCreator},
-	// 	{source: false, args: []string{}, sinkCreator: debug.DebugSinkCreator},
-	// }
-
-	/////////////////////
-	nbcommands = len(commands)
-	wg.Add(nbcommands)
-
-	channels := make([]*swllib.Channel, nbcommands)
-	for i := 0; i < nbcommands; i++ {
-		channels[i] = swllib.NewChannel(8192)
-	}
-
-	pipes := make([]*swllib.Pipe, nbcommands)
-	for i := 0; i < nbcommands; i++ {
-		var prev_pipe *swllib.Pipe = nil
-		if i > 0 {
-			prev_pipe = pipes[i-1]
-		}
-		pipes[i] = swllib.NewPipe(prev_pipe, channels[i])
-	}
-
-	for i := 0; i < nbcommands; i++ {
-		var cmd = commands[i]
-		if cmd.IsSource {
-			if err := swllib.RunSource(&wg, pipes[i], cmd.Name, cmd.Args, cmd.SrcCreator); err != nil {
-				log.Print(`In handler '`, cmd.Name, `': `, err)
-				os.Exit(1)
-			}
-		} else {
-			if err = swllib.RunSink(&wg, pipes[i], cmd.Name, cmd.Args, cmd.SinkCreator); err != nil {
-				log.Print(`In handler '`, cmd.Name, `': `, err)
-				os.Exit(1)
-			}
-		}
-	}
-
-	wg.Wait()
-}
-
-type CommandBlock struct {
-	IsSource    bool
-	Name        string
-	Args        []string
-	SrcCreator  swllib.SourceCreator
-	SinkCreator swllib.SinkCreator
 }
