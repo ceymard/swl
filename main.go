@@ -1,6 +1,10 @@
 package main
 
 import (
+	"errors"
+	"fmt"
+	"log"
+	"os"
 	"sync"
 
 	"github.com/ceymard/swl/debug"
@@ -8,9 +12,68 @@ import (
 	"github.com/ceymard/swl/tester"
 )
 
+func parseArgs() ([]CommandBlock, error) {
+	var (
+		isSource       = true
+		args           = os.Args[1:]
+		name           = ""
+		lookingForName = true
+		acc            = make([]string, 0, 16)
+		res            = make([]CommandBlock, 0, 24)
+	)
+
+	var addToCommands = func() error {
+
+		var cmd = CommandBlock{
+			source: isSource,
+			args:   acc,
+			name:   name,
+		}
+
+		if srcc, ok := swllib.Sources[name]; ok && isSource {
+			cmd.srcCreator = srcc.Creator
+		} else if wrcc, ok := swllib.Sinks[name]; ok && !isSource {
+			cmd.sinkCreator = wrcc.Creator
+		} else {
+			return fmt.Errorf(`Could not find handler for '%s'`, name)
+		}
+		res = append(res, cmd)
+		acc = make([]string, 0, 24)
+		return nil
+	}
+
+	for _, arg := range args {
+		if lookingForName {
+			lookingForName = false
+			name = arg
+		} else if arg == "::" || arg == "++" {
+			if lookingForName {
+				break
+			}
+			lookingForName = true
+			if err := addToCommands(); err != nil {
+				return nil, err
+			}
+
+			isSource = arg == "++"
+		} else {
+			acc = append(acc, arg)
+		}
+	}
+
+	if lookingForName {
+		return nil, errors.New(`missing a source or sink`)
+	}
+	if err := addToCommands(); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 func main() {
 	// Sources
-	swllib.RegisterSource("test", "sends test data", tester.TesterSourceCreator)
+	swllib.RegisterSource("tester", "sends test data", tester.TesterSourceCreator)
 
 	// Sinks
 	swllib.RegisterSink("debug", "prints chunks to the console", debug.DebugSinkCreator)
@@ -18,17 +81,23 @@ func main() {
 	// We're gonna split the args into different commands
 	var (
 		// args       = os.Args[1:]
+		err        error
 		nbcommands int
 		wg         sync.WaitGroup
 		commands   []CommandBlock
 	)
 
 	//// FOR TEST PURPOSES
-	// pp.Print(args)
-	commands = []CommandBlock{
-		{source: true, args: []string{}, srcCreator: tester.TesterSourceCreator},
-		{source: false, args: []string{}, sinkCreator: debug.DebugSinkCreator},
+	if commands, err = parseArgs(); err != nil {
+		log.Print(err)
+		os.Exit(1)
 	}
+	// pp.Print(commands)
+	// pp.Print(args)
+	// commands = []CommandBlock{
+	// 	{source: true, args: []string{}, srcCreator: tester.TesterSourceCreator},
+	// 	{source: false, args: []string{}, sinkCreator: debug.DebugSinkCreator},
+	// }
 
 	/////////////////////
 	nbcommands = len(commands)
@@ -51,9 +120,15 @@ func main() {
 	for i := 0; i < nbcommands; i++ {
 		var cmd = commands[i]
 		if cmd.source {
-			swllib.RunSource(&wg, pipes[i], cmd.args, cmd.srcCreator)
+			if err := swllib.RunSource(&wg, pipes[i], cmd.args, cmd.srcCreator); err != nil {
+				log.Print(`In handler '`, cmd.name, `': `, err)
+				os.Exit(1)
+			}
 		} else {
-			swllib.RunSink(&wg, pipes[i], cmd.args, cmd.sinkCreator)
+			if err = swllib.RunSink(&wg, pipes[i], cmd.args, cmd.sinkCreator); err != nil {
+				log.Print(`In handler '`, cmd.name, `': `, err)
+				os.Exit(1)
+			}
 		}
 	}
 
@@ -62,6 +137,7 @@ func main() {
 
 type CommandBlock struct {
 	source      bool
+	name        string
 	args        []string
 	srcCreator  swllib.SourceCreator
 	sinkCreator swllib.SinkCreator

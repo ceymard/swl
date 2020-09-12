@@ -23,7 +23,12 @@ type Source interface {
 type SourceCreator func(pipe *Pipe, args []string) (Source, error)
 type SinkCreator func(pipe *Pipe, args []string) (Sink, error)
 
-func RunSource(wg *sync.WaitGroup, pipe *Pipe, args []string, srcc SourceCreator) {
+func RunSource(wg *sync.WaitGroup, pipe *Pipe, args []string, srcc SourceCreator) error {
+	src, err := srcc(pipe, args)
+	if err != nil {
+		return err
+	}
+
 	go func() {
 		defer func() {
 			pipe.Close()
@@ -31,15 +36,12 @@ func RunSource(wg *sync.WaitGroup, pipe *Pipe, args []string, srcc SourceCreator
 		}()
 
 		var (
-			src    Source
 			err    error
 			chk    interface{}
 			closed bool
 			up     *Channel
 			w      = pipe.write
 		)
-
-		src, err = srcc(pipe, args)
 
 		if pipe.upstream != nil {
 			up = pipe.upstream.write
@@ -63,9 +65,16 @@ func RunSource(wg *sync.WaitGroup, pipe *Pipe, args []string, srcc SourceCreator
 			pipe.WriteError(err)
 		}
 	}()
+
+	return nil
 }
 
-func RunSink(wg *sync.WaitGroup, pipe *Pipe, args []string, sinkc SinkCreator) {
+func RunSink(wg *sync.WaitGroup, pipe *Pipe, args []string, sinkc SinkCreator) error {
+	sink, err := sinkc(pipe, args)
+	if err != nil {
+		return err
+	}
+
 	// Start our handler
 	go (func() {
 		defer func() {
@@ -74,7 +83,6 @@ func RunSink(wg *sync.WaitGroup, pipe *Pipe, args []string, sinkc SinkCreator) {
 		}()
 
 		var (
-			sink     Sink
 			firstCol = true
 			colhld   CollectionHandler
 			err      error
@@ -83,8 +91,6 @@ func RunSink(wg *sync.WaitGroup, pipe *Pipe, args []string, sinkc SinkCreator) {
 			index    uint = 1
 			up            = pipe.upstream.write
 		)
-
-		sink, err = sinkc(pipe, args)
 
 		// missing command handling.
 		for chk, closed = up.Read(); err == nil && !closed; chk, closed = up.Read() {
@@ -109,6 +115,8 @@ func RunSink(wg *sync.WaitGroup, pipe *Pipe, args []string, sinkc SinkCreator) {
 		}
 
 	})()
+
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////
