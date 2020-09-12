@@ -2,6 +2,7 @@ package debug
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/ceymard/swl/swllib"
 	"github.com/k0kubun/pp"
@@ -16,6 +17,8 @@ func DebugSinkCreator(pipe *swllib.Pipe, args []string) (swllib.Sink, error) {
 		return nil, errors.New("debug does not accept arguments")
 	}
 
+	// Should probably read args to disable colors
+	pp.PrintMapTypes = false
 	return &DebugSink{}, nil
 }
 
@@ -24,20 +27,22 @@ func (d *DebugSink) OnError(err error) {
 }
 
 func (d *DebugSink) OnCollectionStart(name string) (swllib.CollectionHandler, error) {
-	_, err := pp.Printf("Collection start %v\n", name)
 	d.col = name
-	return d, err
+	return d, nil
 }
 
 func (d *DebugSink) OnCollectionEnd() error {
 	return nil
 }
 
-func (d *DebugSink) OnData(data map[string]interface{}, idx uint) error {
-	_, err := pp.Printf("%s:%v: %v\n", d.col, int(idx), data)
-	return err
+func (d *DebugSink) OnData(data swllib.Data, idx uint) error {
+	var s = pp.Sprintf("%s@%v: %v", d.col, int(idx), data)
+	print(strings.ReplaceAll(s, "\n", ""), "\n")
+	return nil
 }
 
 func (d *DebugSink) OnEnd() error {
 	return nil
 }
+
+// func

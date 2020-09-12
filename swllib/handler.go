@@ -5,7 +5,7 @@ import (
 )
 
 type CollectionHandler interface {
-	OnData(ch map[string]interface{}, index uint) error
+	OnData(ch Data, index uint) error
 	OnEnd() error
 }
 
