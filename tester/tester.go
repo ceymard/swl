@@ -21,6 +21,8 @@ func (t *Tester) Emit() error {
 		err = t.pipe.WriteData(swllib.Data{"Hello": 1, "World": i, "Test": "str"})
 	}
 
+	err = t.pipe.WriteData(swllib.Data{"testing": []string{"hey", "ho"}})
+
 	t.pipe.Close()
 
 	if err != nil {
