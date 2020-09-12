@@ -1,6 +1,7 @@
 package swllib
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -23,10 +24,10 @@ type Source interface {
 type SourceCreator func(pipe *Pipe, args []string) (Source, error)
 type SinkCreator func(pipe *Pipe, args []string) (Sink, error)
 
-func RunSource(wg *sync.WaitGroup, pipe *Pipe, args []string, srcc SourceCreator) error {
+func RunSource(wg *sync.WaitGroup, pipe *Pipe, name string, args []string, srcc SourceCreator) error {
 	src, err := srcc(pipe, args)
 	if err != nil {
-		return err
+		return fmt.Errorf("in handler '%s': %w", name, err)
 	}
 
 	go func() {
@@ -62,6 +63,7 @@ func RunSource(wg *sync.WaitGroup, pipe *Pipe, args []string, srcc SourceCreator
 		}
 
 		if err != nil {
+			err = fmt.Errorf("in handler '%s': %w", name, err)
 			pipe.WriteError(err)
 		}
 	}()
@@ -69,10 +71,10 @@ func RunSource(wg *sync.WaitGroup, pipe *Pipe, args []string, srcc SourceCreator
 	return nil
 }
 
-func RunSink(wg *sync.WaitGroup, pipe *Pipe, args []string, sinkc SinkCreator) error {
+func RunSink(wg *sync.WaitGroup, pipe *Pipe, name string, args []string, sinkc SinkCreator) error {
 	sink, err := sinkc(pipe, args)
 	if err != nil {
-		return err
+		return fmt.Errorf("in handler '%s': %w", name, err)
 	}
 
 	// Start our handler
@@ -110,6 +112,7 @@ func RunSink(wg *sync.WaitGroup, pipe *Pipe, args []string, sinkc SinkCreator) e
 		}
 
 		if err != nil {
+			err = fmt.Errorf("in handler '%s': %w", name, err)
 			pipe.WriteError(err)
 			sink.OnError(err)
 		}

@@ -25,15 +25,15 @@ func parseArgs() ([]CommandBlock, error) {
 	var addToCommands = func() error {
 
 		var cmd = CommandBlock{
-			source: isSource,
-			args:   acc,
-			name:   name,
+			IsSource: isSource,
+			Args:     acc,
+			Name:     name,
 		}
 
 		if srcc, ok := swllib.Sources[name]; ok && isSource {
-			cmd.srcCreator = srcc.Creator
+			cmd.SrcCreator = srcc.Creator
 		} else if wrcc, ok := swllib.Sinks[name]; ok && !isSource {
-			cmd.sinkCreator = wrcc.Creator
+			cmd.SinkCreator = wrcc.Creator
 		} else {
 			return fmt.Errorf(`Could not find handler for '%s'`, name)
 		}
@@ -119,14 +119,14 @@ func main() {
 
 	for i := 0; i < nbcommands; i++ {
 		var cmd = commands[i]
-		if cmd.source {
-			if err := swllib.RunSource(&wg, pipes[i], cmd.args, cmd.srcCreator); err != nil {
-				log.Print(`In handler '`, cmd.name, `': `, err)
+		if cmd.IsSource {
+			if err := swllib.RunSource(&wg, pipes[i], cmd.Name, cmd.Args, cmd.SrcCreator); err != nil {
+				log.Print(`In handler '`, cmd.Name, `': `, err)
 				os.Exit(1)
 			}
 		} else {
-			if err = swllib.RunSink(&wg, pipes[i], cmd.args, cmd.sinkCreator); err != nil {
-				log.Print(`In handler '`, cmd.name, `': `, err)
+			if err = swllib.RunSink(&wg, pipes[i], cmd.Name, cmd.Args, cmd.SinkCreator); err != nil {
+				log.Print(`In handler '`, cmd.Name, `': `, err)
 				os.Exit(1)
 			}
 		}
@@ -136,9 +136,9 @@ func main() {
 }
 
 type CommandBlock struct {
-	source      bool
-	name        string
-	args        []string
-	srcCreator  swllib.SourceCreator
-	sinkCreator swllib.SinkCreator
+	IsSource    bool
+	Name        string
+	Args        []string
+	SrcCreator  swllib.SourceCreator
+	SinkCreator swllib.SinkCreator
 }
