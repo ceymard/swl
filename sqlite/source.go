@@ -38,7 +38,7 @@ func SqliteSourceCreator(pipe *swllib.Pipe, args []string) (swllib.Source, error
 
 	// pp.Print(cli)
 	// journal mode off only for source, force wal otherwise.
-	if db, err = sql.Open("sqlite3", cli.URI+"?_mode=ro"); err != nil {
+	if db, err = sql.Open("sqlite3", "file:"+cli.URI+"?mode=ro"); err != nil {
 		return nil, err
 	}
 
@@ -151,6 +151,9 @@ func (s *SqliteSource) processTable(tbl TableRequest) error {
 		return err
 	}
 
+	// FIXME : for columns that come from views or dynamic statements,
+	// we might need to process the first rows that are not null to get
+	// correct typing...
 	var hints = make(map[string]string)
 	for i, col := range cols {
 		hints[col] = types[i].DatabaseTypeName()
