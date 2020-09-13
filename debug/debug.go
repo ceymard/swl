@@ -30,6 +30,7 @@ func (d *DebugSink) OnError(err error) {
 
 func (d *DebugSink) OnCollectionStart(start *swllib.CollectionStartChunk, data []swllib.Data) (swllib.CollectionHandler, error) {
 	d.col = start.Name
+	pp.Print(start.TypeHints)
 	return d, nil
 }
 

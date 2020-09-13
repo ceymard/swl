@@ -19,7 +19,7 @@ type Tester struct {
 func (t *Tester) Emit() error {
 	var err error
 
-	err = t.pipe.WriteStartCollection("test-1")
+	err = t.pipe.WriteStartCollection(&swllib.CollectionStartChunk{Name: "test-1"})
 
 	for i := 0; err == nil && i < 12; i++ {
 		err = t.pipe.WriteData(swllib.Data{"Hello": 1, "World": i, "Test": "str"})

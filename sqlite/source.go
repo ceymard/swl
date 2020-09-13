@@ -132,10 +132,11 @@ func (s *SqliteSource) Emit() error {
 
 func (s *SqliteSource) processTable(tbl TableRequest) error {
 	var (
-		rows *sql.Rows
-		cols []string
-		err  error
-		m    map[string]interface{}
+		rows  *sql.Rows
+		cols  []string
+		types []*sql.ColumnType
+		err   error
+		m     map[string]interface{}
 	)
 
 	if rows, err = s.conn.Query(tbl.query); err != nil {
@@ -146,8 +147,19 @@ func (s *SqliteSource) processTable(tbl TableRequest) error {
 	if cols, err = rows.Columns(); err != nil {
 		return err
 	}
+	if types, err = rows.ColumnTypes(); err != nil {
+		return err
+	}
 
-	s.pipe.WriteStartCollection(tbl.name)
+	var hints = make(map[string]string)
+	for i, col := range cols {
+		hints[col] = types[i].DatabaseTypeName()
+	}
+
+	s.pipe.WriteStartCollection(&swllib.CollectionStartChunk{
+		Name:      tbl.name,
+		TypeHints: hints,
+	})
 	for rows.Next() {
 		if m, err = RowsToMap(cols, rows); err != nil {
 			return err

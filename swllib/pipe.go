@@ -66,8 +66,8 @@ func NewPipe(upstream *Pipe, write *Channel) *Pipe {
 	return &Pipe{upstream, write}
 }
 
-func (p *Pipe) WriteStartCollection(name string) error {
-	return p.write.writeChunk(&CollectionStartChunk{Name: name})
+func (p *Pipe) WriteStartCollection(start *CollectionStartChunk) error {
+	return p.write.writeChunk(start)
 }
 
 func (p *Pipe) WriteData(payload map[string]interface{}) error {
