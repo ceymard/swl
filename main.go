@@ -7,20 +7,14 @@ import (
 	"os"
 	"sync"
 
-	"github.com/ceymard/swl/debug"
 	"github.com/ceymard/swl/swllib"
-	"github.com/ceymard/swl/tester"
 
-	swlite "github.com/ceymard/swl/sqlite"
+	_ "github.com/ceymard/swl/debug"
+	_ "github.com/ceymard/swl/sqlite"
+	_ "github.com/ceymard/swl/tester"
 )
 
 func main() {
-	// Sources
-	swllib.RegisterSource("tester", "sends test data", tester.TesterSourceCreator)
-	swllib.RegisterSource("sqlite", "sqlite handler", swlite.SqliteSourceCreator)
-
-	// Sinks
-	swllib.RegisterSink("debug", "prints chunks to the console", debug.DebugSinkCreator)
 
 	// We're gonna split the args into different commands
 	var (

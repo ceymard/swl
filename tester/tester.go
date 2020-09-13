@@ -4,6 +4,10 @@ import (
 	"github.com/ceymard/swl/swllib"
 )
 
+func init() {
+	swllib.RegisterSource("tester", "tester source", TesterSourceCreator)
+}
+
 func TesterSourceCreator(pipe *swllib.Pipe, args []string) (swllib.Source, error) {
 	return &Tester{pipe}, nil
 }

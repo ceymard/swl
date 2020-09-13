@@ -28,8 +28,8 @@ func (d *DebugSink) OnError(err error) {
 	pp.Print(err)
 }
 
-func (d *DebugSink) OnCollectionStart(name string) (swllib.CollectionHandler, error) {
-	d.col = name
+func (d *DebugSink) OnCollectionStart(start *swllib.CollectionStartChunk, data []swllib.Data) (swllib.CollectionHandler, error) {
+	d.col = start.Name
 	return d, nil
 }
 

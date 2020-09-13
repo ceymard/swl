@@ -12,7 +12,7 @@ type CollectionHandler interface {
 
 type Sink interface {
 	// Parse the arguments given by the command line
-	OnCollectionStart(name string) (CollectionHandler, error)
+	OnCollectionStart(start *CollectionStartChunk, firstData []Data) (CollectionHandler, error)
 	OnEnd() error
 	OnError(err error)
 }
@@ -52,15 +52,19 @@ func RunSource(wg *sync.WaitGroup, pipe *Pipe, name string, args []string, srcc 
 			for chk, closed = up.Read(); err == nil && !closed; chk, closed = up.Read() {
 				if errr, ok := chk.(error); ok {
 					err = errr
+					break
 				} else {
 					w.writeChunk(chk)
 				}
 			}
 		}
 
-		if err == nil {
-			err = src.Emit()
+		if err != nil {
+			pipe.WriteError(err)
+			return
 		}
+
+		err = src.Emit()
 
 		if err != nil {
 			err = fmt.Errorf("in handler '%s': %w", name, err)
@@ -105,16 +109,19 @@ func RunSink(wg *sync.WaitGroup, pipe *Pipe, name string, args []string, sinkc S
 					firstCol = false
 				}
 				index = 1
-				colhld, err = sink.OnCollectionStart(start.Name)
+				colhld, err = sink.OnCollectionStart(start, []Data{})
 			} else if errr, ok := chk.(error); ok {
-				err = errr
+				pipe.WriteError(errr)
+				sink.OnError(errr)
+				return
 			}
-		}
 
-		if err != nil {
-			err = fmt.Errorf("in handler '%s': %w", name, err)
-			pipe.WriteError(err)
-			sink.OnError(err)
+			if err != nil {
+				err = fmt.Errorf("in handler '%s': %w", name, err)
+				pipe.WriteError(err)
+				sink.OnError(err)
+				return
+			}
 		}
 
 	})()
