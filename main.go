@@ -84,7 +84,7 @@ type CommandBlock struct {
 func parseArgs() ([]CommandBlock, error) {
 	var (
 		isSource       = true
-		args           = os.Args[1:]
+		args           = append(os.Args[1:], "::", "debug")
 		name           = ""
 		lookingForName = true
 		acc            = make([]string, 0, 16)

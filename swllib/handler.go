@@ -109,6 +109,8 @@ func RunSink(wg *sync.WaitGroup, pipe *Pipe, name string, args []string, sinkc S
 					firstCol = false
 				}
 				index = 1
+				// now entering buffered mode for a few data buffers
+
 				colhld, err = sink.OnCollectionStart(start, []Data{})
 			} else if errr, ok := chk.(error); ok {
 				pipe.WriteError(errr)

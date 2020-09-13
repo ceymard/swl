@@ -14,7 +14,7 @@ import (
 
 type SqliteSourceArgs struct {
 	URI     string   `arg required type:'path'`
-	Sources []string `arg`
+	Sources []string `arg optional`
 	Coerce  bool
 }
 
@@ -37,7 +37,8 @@ func SqliteSourceCreator(pipe *swllib.Pipe, args []string) (swllib.Source, error
 	}
 
 	// pp.Print(cli)
-	if db, err = sql.Open("sqlite3", cli.URI); err != nil {
+	// journal mode off only for source, force wal otherwise.
+	if db, err = sql.Open("sqlite3", cli.URI+"?_mode=ro"); err != nil {
 		return nil, err
 	}
 
