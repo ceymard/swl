@@ -1,4 +1,5 @@
 /// Code taken and not included with go deps
+/// Author is github.com/itsmontoya/mailbox
 package swllib
 
 import (

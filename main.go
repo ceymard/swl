@@ -10,8 +10,10 @@ import (
 	"github.com/ceymard/swl/swllib"
 
 	_ "github.com/ceymard/swl/debug"
-	_ "github.com/ceymard/swl/sqlite"
 	_ "github.com/ceymard/swl/tester"
+
+	_ "github.com/ceymard/swl/postgres"
+	_ "github.com/ceymard/swl/sqlite"
 )
 
 func main() {
