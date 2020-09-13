@@ -14,17 +14,24 @@ const (
 // The writing handler needs to wait if the buffer is full and reader did not consume it.
 // The reading handler needs to wait for the writer to fill its buffer
 type Channel struct {
-	mailbox *Mailbox
+	mailbox   *Mailbox
+	paused    bool
+	pause_buf []interface{}
 }
 
 func NewChannel(bufsize int) *Channel {
-	p := &Channel{mailbox: NewMailbox(bufsize)}
+	p := &Channel{mailbox: NewMailbox(bufsize), pause_buf: make([]interface{}, 0, 32)}
 	return p
 }
 
 /////////////////////////////// Functions called by the writer
 
 func (p *Channel) writeChunk(chk interface{}) error {
+	if p.paused {
+		p.pause_buf = append(p.pause_buf, chk)
+		return nil
+	}
+
 	if p.mailbox.isClosed() {
 		// log.Print("trying to write on a closed pipe")
 		// debug.PrintStack()
