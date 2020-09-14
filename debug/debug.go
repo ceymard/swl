@@ -12,53 +12,62 @@ import (
 	"github.com/k0kubun/pp"
 )
 
-type DebugSink struct {
+func init() {
+	swllib.RegisterSink(debugSinkCreator, "prints chunks to the console", "debug")
+}
+
+type debugSink struct {
 	col string
 }
 
-func DebugSinkCreator(pipe *swllib.Pipe, args []string) (swllib.Sink, error) {
+func debugSinkCreator(_ *swllib.Pipe, args []string) (swllib.Sink, error) {
 	if len(args) > 0 {
 		return nil, errors.New("debug does not accept arguments")
 	}
 
 	// Should probably read args to disable colors
 	color.NoColor = false
-	return &DebugSink{}, nil
+	return &debugSink{}, nil
 }
 
-func (d *DebugSink) OnError(err error) {
+// OnError .
+func (d *debugSink) OnError(err error) {
 	pp.Print(err)
 }
 
-func (d *DebugSink) OnCollectionStart(start *swllib.CollectionStartChunk, data []swllib.Data) (swllib.CollectionHandler, error) {
+// OnCollectionStart .
+func (d *debugSink) OnCollectionStart(start *swllib.CollectionStartChunk) (swllib.CollectionHandler, error) {
 	d.col = start.Name
 	// pp.Print(start.TypeHints)
 	return d, nil
 }
 
-func (d *DebugSink) OnCollectionEnd() error {
+// OnCollectionEnd .
+func (d *debugSink) OnCollectionEnd() error {
 	return nil
 }
 
 var (
-	CY       = color.New(color.Bold, color.FgCyan)
-	GE       = color.New(color.Bold, color.FgHiGreen)
+	cy       = color.New(color.Bold, color.FgCyan)
+	ge       = color.New(color.Bold, color.FgHiGreen)
 	coProp   = color.New(color.FgGreen, color.Faint)
 	coString = color.New(color.FgGreen)
 	coNull   = color.New(color.FgRed)
 	coNum    = color.New(color.FgHiMagenta)
 )
 
-func (d *DebugSink) OnData(data swllib.Data, idx uint) error {
-	CY.Print(d.col, ` `)
-	GE.Print(int(idx))
-	fmt.Print(` `)
+// OnData .
+func (d *debugSink) OnData(data swllib.Data, idx uint) error {
+	cy.Print(d.col, ` `)
+	ge.Print(int(idx))
+	_, _ = fmt.Print(` `)
 	pretty(data)
-	fmt.Print("\n")
+	_, _ = fmt.Print("\n")
 	return nil
 }
 
-func (d *DebugSink) OnEnd() error {
+// OnEnd .
+func (d *debugSink) OnEnd() error {
 	return nil
 }
 
@@ -84,7 +93,7 @@ func pretty(v interface{}) {
 			mp   = v.(swllib.Data)
 		)
 
-		for k, _ := range mp {
+		for k := range mp {
 			keys = append(keys, k)
 		}
 
@@ -92,7 +101,7 @@ func pretty(v interface{}) {
 
 		for i, k := range keys {
 			if i > 0 {
-				fmt.Print(`, `)
+				_, _ = fmt.Print(`, `)
 			}
 			coProp.Print(color.GreenString(k), `: `)
 			pretty(mp[k])
@@ -112,32 +121,32 @@ func pretty(v interface{}) {
 		// case reflect.String:
 		// 	fmt.Printf("string: %v\n", ref.String())
 		case reflect.Slice:
-			fmt.Print("[")
+			_, _ = fmt.Print("[")
 			for i, l := 0, ref.Len(); i < l; i++ {
 				if i > 0 {
-					fmt.Print(", ")
+					_, _ = fmt.Print(", ")
 				}
 				pretty(ref.Index(i).Interface())
 			}
-			fmt.Print("]")
+			_, _ = fmt.Print("]")
 			// fmt.Printf("slice: len=%d, %v\n", ref.Len(), ref.Interface())
 		case reflect.Map:
-			fmt.Print("{")
+			_, _ = fmt.Print("{")
 			for i, key := range ref.MapKeys() {
 				if i > 0 {
-					fmt.Print(", ")
+					_, _ = fmt.Print(", ")
 				}
 				pretty(key.Interface())
-				fmt.Print(": ")
+				_, _ = fmt.Print(": ")
 				var elt = ref.MapIndex(key)
 				pretty(elt.Interface())
 			}
-			fmt.Print("}")
+			_, _ = fmt.Print("}")
 			// fmt.Printf("map: %v\n", ref.Interface())
 		case reflect.Chan:
-			fmt.Printf("chan %v\n", ref.Interface())
+			_, _ = fmt.Printf("chan %v\n", ref.Interface())
 		default:
-			fmt.Printf(`%v`, ref)
+			_, _ = fmt.Printf(`%v`, ref)
 		}
 
 	}

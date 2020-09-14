@@ -7,24 +7,34 @@ import (
 
 	"database/sql"
 
+	// need sqlite, can be disabled in build
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type SqliteSourceArgs struct {
+func init() {
+	swllib.RegisterSource(sqliteSourceCreator, "sqlite handler", "sqlite",
+		".sqlite",
+		".sqlite3",
+		".db",
+		"sqlite://",
+	)
+}
+
+type sqliteSourceArgs struct {
 	URI     string   `arg required type:'path'`
 	Sources []string `arg optional`
 	Coerce  bool
 }
 
 // The SQLite source for swl
-func SqliteSourceCreator(pipe *swllib.Pipe, args []string) (swllib.Source, error) {
+func sqliteSourceCreator(pipe *swllib.Pipe, args []string) (swllib.Source, error) {
 	var (
 		err error
 		db  *sql.DB
 		req []swllib.SQLTableRequest
 	)
 
-	cli := SqliteSourceArgs{}
+	cli := sqliteSourceArgs{}
 	if err = swllib.ParseArgs(&cli, args); err != nil {
 		return nil, err
 	}
@@ -39,23 +49,18 @@ func SqliteSourceCreator(pipe *swllib.Pipe, args []string) (swllib.Source, error
 		req = swllib.ParseSQLTableRequests(cli.Sources)
 	}
 
-	return &SqliteSource{pipe, db, req}, nil
+	return &sqliteSource{pipe, db, req}, nil
 }
 
-type SqliteSource struct {
+type sqliteSource struct {
 	pipe   *swllib.Pipe
 	conn   *sql.DB
 	tables []swllib.SQLTableRequest
 }
 
-type TableRequest struct {
-	name  string
-	query string
-}
-
 // Returns a list of table or views to be queried by default
 // when no table argument is provided
-func (s *SqliteSource) getAllTableLikes() error {
+func (s *sqliteSource) getAllTableLikes() error {
 	var (
 		table string
 		err   error
@@ -80,7 +85,7 @@ func (s *SqliteSource) getAllTableLikes() error {
 	return nil
 }
 
-func (s *SqliteSource) Emit() error {
+func (s *sqliteSource) Emit() error {
 	defer s.conn.Close()
 
 	var (
@@ -103,7 +108,7 @@ func (s *SqliteSource) Emit() error {
 	return nil
 }
 
-func (s *SqliteSource) processTable(tbl swllib.SQLTableRequest) error {
+func (s *sqliteSource) processTable(tbl swllib.SQLTableRequest) error {
 	var (
 		rows  *sql.Rows
 		cols  []string

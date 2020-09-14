@@ -14,7 +14,7 @@ type CollectionHandler interface {
 
 type Sink interface {
 	// Parse the arguments given by the command line
-	OnCollectionStart(start *CollectionStartChunk, firstData []Data) (CollectionHandler, error)
+	OnCollectionStart(start *CollectionStartChunk) (CollectionHandler, error)
 	OnEnd() error
 	OnError(err error)
 }
@@ -103,29 +103,44 @@ func RunSink(wg *sync.WaitGroup, pipe *Pipe, name string, args []string, sinkc S
 		// missing command handling.
 		for chk, closed = up.Read(); err == nil && !closed; chk, closed = up.Read() {
 			if dt, ok := chk.(map[string]interface{}); ok {
-				err = colhld.OnData(dt, index)
+				if err = colhld.OnData(dt, index); err != nil {
+					break
+				}
 				index++
 			} else if start, ok := chk.(*CollectionStartChunk); ok {
 				if !firstCol {
-					colhld.OnEnd()
+					if err = colhld.OnEnd(); err != nil {
+						break
+					}
 					firstCol = false
+
 				}
 				index = 1
 				// now entering buffered mode for a few data buffers
 
-				colhld, err = sink.OnCollectionStart(start, []Data{})
+				if colhld, err = sink.OnCollectionStart(start); err != nil {
+					break
+				}
 			} else if errr, ok := chk.(error); ok {
-				pipe.WriteError(errr)
+				_ = pipe.WriteError(errr)
 				sink.OnError(errr)
 				return
 			}
+		}
 
-			if err != nil {
-				err = fmt.Errorf("in handler '%s': %w", name, err)
-				pipe.WriteError(err)
-				sink.OnError(err)
-				return
-			}
+		if !firstCol {
+			err = colhld.OnEnd()
+		}
+
+		if err == nil {
+			err = sink.OnEnd()
+		}
+
+		if err != nil {
+			err = fmt.Errorf("in handler '%s': %w", name, err)
+			_ = pipe.WriteError(err)
+			sink.OnError(err)
+			return
 		}
 
 	})()
@@ -135,71 +150,77 @@ func RunSink(wg *sync.WaitGroup, pipe *Pipe, name string, args []string, sinkc S
 
 ////////////////////////////////////////////////////////////////
 
+// RegisteredSource A registered source
 type RegisteredSource struct {
 	Name    string
 	Help    string
 	Creator SourceCreator
 }
 
+// RegisteredSink is A registered sink
 type RegisteredSink struct {
 	Name    string
 	Help    string
 	Creator SinkCreator
 }
 
-var Sources = make(map[string]*RegisteredSource)
-var Sinks = make(map[string]*RegisteredSink)
+var sources = make(map[string]*RegisteredSource)
+var sinks = make(map[string]*RegisteredSink)
 
+// RegisterSource registers a source
 func RegisterSource(cbk SourceCreator, help string, names ...string) {
 	for _, name := range names {
-		Sources[name] = &RegisteredSource{name, help, cbk}
+		sources[name] = &RegisteredSource{name, help, cbk}
 	}
 }
 
+// RegisterSink registers a sink
 func RegisterSink(cbk SinkCreator, help string, names ...string) {
 	for _, name := range names {
-		Sinks[name] = &RegisteredSink{name, help, cbk}
+		sinks[name] = &RegisteredSink{name, help, cbk}
 	}
 }
 
 var reProto = regexp.MustCompile(`^[-a-zA-Z_]+://`)
 
+// GetSource gets asource
 func GetSource(pth string) (*RegisteredSource, bool) {
 
-	if reg, ok := Sources[pth]; ok {
+	if reg, ok := sources[pth]; ok {
 		return reg, false
 	}
 
 	// look for proto://
 	proto := reProto.FindString(pth)
-	if reg, ok := Sources[proto]; ok {
+	if reg, ok := sources[proto]; ok {
 		return reg, true
 	}
 
 	// lastly, look for extension
 	ext := path.Ext(pth)
-	if reg, ok := Sources[ext]; ok {
+	if reg, ok := sources[ext]; ok {
 		return reg, true
 	}
 
 	return nil, false
 }
 
+// GetSink Gets a Sink
 func GetSink(pth string) (*RegisteredSink, bool) {
 
-	if reg, ok := Sinks[pth]; ok {
+	if reg, ok := sinks[pth]; ok {
 		return reg, false
 	}
 
 	// look for proto://
 	proto := reProto.FindString(pth)
-	if reg, ok := Sinks[proto]; ok {
+	if reg, ok := sinks[proto]; ok {
 		return reg, true
 	}
 
 	// lastly, look for extension
-	ext := "." + path.Ext(pth)
-	if reg, ok := Sinks[ext]; ok {
+	ext := path.Ext(pth)
+	if reg, ok := sinks[ext]; ok {
 		return reg, true
 	}
 

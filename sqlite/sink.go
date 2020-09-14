@@ -3,6 +3,7 @@ package swlite
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/ceymard/swl/swllib"
 )
@@ -55,6 +56,24 @@ type sqliteSink struct {
 	db   *sql.DB
 }
 
+func (s *sqliteSink) exec(query string) error {
+	if _, err := s.db.Exec(query); err != nil {
+		return fmt.Errorf(`in statement '%s' %w`, query, err)
+	}
+	return nil
+}
+
+func (s *sqliteSink) prepare(query string) (*sql.Stmt, error) {
+	var (
+		stmt *sql.Stmt
+		err  error
+	)
+	if stmt, err = s.db.Prepare(query); err != nil {
+		return nil, fmt.Errorf(`error when preparing '%s' %w`, query, err)
+	}
+	return stmt, nil
+}
+
 func (s *sqliteSink) OnError(_ error) {
 	// send rollback
 	_, _ = s.db.Exec("ROLLBACK")
@@ -62,10 +81,11 @@ func (s *sqliteSink) OnError(_ error) {
 }
 
 func (s *sqliteSink) OnEnd() error {
+	defer s.db.Close()
 	if _, err := s.db.Exec("COMMIT"); err != nil {
 		return err
 	}
-	return s.db.Close()
+	return nil
 }
 
 func (s *sqliteSink) OnCollectionStart(start *swllib.CollectionStartChunk) (swllib.CollectionHandler, error) {
@@ -73,21 +93,34 @@ func (s *sqliteSink) OnCollectionStart(start *swllib.CollectionStartChunk) (swll
 		stmt    *sql.Stmt
 		err     error
 		columns = make([]string, len(start.TypeHints))
-		types   = make([]string, len(start.TypeHints))
+		query   swllib.Buffer
 	)
-
-	i := 0
-	for k, v := range start.TypeHints {
-		columns[i] = k
-		types[i] = v // SHOULD PROBABLY REORDER THAT
-		i++
-	}
 
 	// Table may be dropped and then recreated.
 	if s.args.Drop {
-		if _, err = s.db.Exec(fmt.Sprintf(`DROP TABLE IF EXISTS "%s"`, start.Name)); err != nil {
+		if err = s.exec(fmt.Sprintf(`DROP TABLE IF EXISTS "%s"`, start.Name)); err != nil {
 			return nil, err
 		}
+	}
+
+	// Create table
+	_ = query.WriteStrings(`CREATE TABLE IF NOT EXISTS "`, start.Name, `" (`)
+
+	// Get the hints
+	i := 0
+	for k, v := range start.TypeHints {
+		columns[i] = k
+		if i > 0 {
+			_ = query.WriteStrings(", ")
+		}
+		_ = query.WriteStrings(k, " ", v)
+		i++
+	}
+
+	_, _ = query.WriteString(`)`)
+
+	if err = s.exec(query.String()); err != nil {
+		return nil, err
 	}
 
 	// Recreate the table
@@ -96,12 +129,27 @@ func (s *sqliteSink) OnCollectionStart(start *swllib.CollectionStartChunk) (swll
 
 	// If we need to truncate, to it now.
 	if s.args.Truncate {
-		if _, err = s.db.Exec(fmt.Sprintf(`DELETE FROM TABLE "%s"`, start.Name)); err != nil {
+		if err = s.exec(fmt.Sprintf(`DELETE FROM TABLE "%s"`, start.Name)); err != nil {
 			return nil, err
 		}
 	}
 
-	if stmt, err = s.db.Prepare(`INSERT INTO `); err != nil {
+	query = swllib.Buffer{}
+	query.WriteStrings(`INSERT `)
+	if s.args.Upsert {
+		query.WriteStrings(`OR REPLACE `)
+	}
+	query.WriteStrings(`INTO "`, start.Name, `" (`, strings.Join(columns, ", "), ") VALUES (")
+	for i := range columns {
+		if i > 0 {
+			query.WriteString(", ?")
+		} else {
+			query.WriteString("?")
+		}
+	}
+	query.WriteStrings(`)`)
+
+	if stmt, err = s.prepare(query.String()); err != nil {
 		// Wrap !
 		return nil, err
 	}
