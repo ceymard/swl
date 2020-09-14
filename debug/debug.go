@@ -3,7 +3,9 @@ package debug
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/ceymard/swl/swllib"
 	"github.com/fatih/color"
@@ -30,7 +32,7 @@ func (d *DebugSink) OnError(err error) {
 
 func (d *DebugSink) OnCollectionStart(start *swllib.CollectionStartChunk, data []swllib.Data) (swllib.CollectionHandler, error) {
 	d.col = start.Name
-	pp.Print(start.TypeHints)
+	// pp.Print(start.TypeHints)
 	return d, nil
 }
 
@@ -64,13 +66,17 @@ func pretty(v interface{}) {
 	switch v.(type) {
 	case nil:
 		coNull.Print("null")
-	case float32, float64, int, int16, int32, int64, int8:
+	case bool:
+		coNull.Print(v)
+	case float32, float64, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 		coNum.Print(v)
-
-	case []interface{}:
-
 	case string:
-		coString.Print(`"`, v, `"`)
+		var s = v.(string)
+		if strings.Contains(s, " ") || len(s) == 0 {
+			coString.Print(`"`, s, `"`)
+		} else {
+			coString.Print(v)
+		}
 	case swllib.Data:
 
 		var (
@@ -93,6 +99,46 @@ func pretty(v interface{}) {
 		}
 
 	default:
-		fmt.Printf(`%v`, v)
+		ref := reflect.ValueOf(v)
+		switch ref.Kind() {
+		// case reflect.Bool:
+		// 	fmt.Printf("bool: %v\n", ref.Bool())
+		// case reflect.Int, reflect.Int8, reflect.Int32, reflect.Int64:
+		// 	fmt.Printf("int: %v\n", ref.Int())
+		// case reflect.Uint, reflect.Uint8, reflect.Uint32, reflect.Uint64:
+		// 	fmt.Printf("int: %v\n", ref.Uint())
+		// case reflect.Float32, reflect.Float64:
+		// 	fmt.Printf("float: %v\n", ref.Float())
+		// case reflect.String:
+		// 	fmt.Printf("string: %v\n", ref.String())
+		case reflect.Slice:
+			fmt.Print("[")
+			for i, l := 0, ref.Len(); i < l; i++ {
+				if i > 0 {
+					fmt.Print(", ")
+				}
+				pretty(ref.Index(i).Interface())
+			}
+			fmt.Print("]")
+			// fmt.Printf("slice: len=%d, %v\n", ref.Len(), ref.Interface())
+		case reflect.Map:
+			fmt.Print("{")
+			for i, key := range ref.MapKeys() {
+				if i > 0 {
+					fmt.Print(", ")
+				}
+				pretty(key.Interface())
+				fmt.Print(": ")
+				var elt = ref.MapIndex(key)
+				pretty(elt.Interface())
+			}
+			fmt.Print("}")
+			// fmt.Printf("map: %v\n", ref.Interface())
+		case reflect.Chan:
+			fmt.Printf("chan %v\n", ref.Interface())
+		default:
+			fmt.Printf(`%v`, ref)
+		}
+
 	}
 }

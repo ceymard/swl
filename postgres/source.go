@@ -4,13 +4,17 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/ceymard/swl/swllib"
 	"github.com/jackc/pgx/v4"
 )
 
 func init() {
-	swllib.RegisterSource("pg", `postgres source`, PostgresSourceCreator)
+	swllib.RegisterSource(PostgresSourceCreator, `postgres source`,
+		"pg",
+		"postgres://",
+	)
 }
 
 type PostgresSourceArgs struct {
@@ -24,6 +28,7 @@ func PostgresSourceCreator(pipe *swllib.Pipe, args []string) (swllib.Source, err
 		arr PostgresSourceArgs
 		err error
 	)
+
 	if err = swllib.ParseArgs(&arr, args); err != nil {
 		return nil, err
 	}
@@ -49,13 +54,24 @@ func (ps *PostgresSource) Emit() error {
 	if uri, err = swllib.HandleURI(ps.args.URI); err != nil {
 		return err
 	}
-	// Close the SSH tunnel if there was one.
-	defer uri.Close()
 
-	if conn, err = pgx.Connect(ctx, "postgres://"+uri.ClientURI); err != nil {
+	defer uri.Close()
+	// Close the SSH tunnel if there was one.
+
+	url := uri.ClientURI
+	if !strings.Contains(uri.ClientURI, "postgres://") {
+		url = "postgres://" + url
+	}
+
+	if conn, err = pgx.Connect(ctx, url); err != nil {
 		return err
 	}
-	defer conn.Close(ctx)
+
+	defer func() {
+		// unfortunately, it seems that closing inside a ssh tunnel just doesn't work when a tunnel is opened,
+		// as it waits for the tunnel to be closed (?!)
+		go conn.Close(ctx)
+	}()
 
 	if len(ps.args.Sources) > 0 {
 		req = swllib.ParseSQLTableRequests(ps.args.Sources)
@@ -71,7 +87,7 @@ func (ps *PostgresSource) Emit() error {
 		}
 	}
 
-	return err
+	return nil
 }
 
 func (ps *PostgresSource) HandleCollection(ctx context.Context, client *pgx.Conn, req swllib.SQLTableRequest) error {
@@ -86,7 +102,8 @@ func (ps *PostgresSource) HandleCollection(ctx context.Context, client *pgx.Conn
 	if rows, err = client.Query(ctx, fmt.Sprintf(`SELECT row_to_json(T) as res FROM (%s) T`, req.Query)); err != nil {
 		return err
 	}
-	defer rows.Close()
+	// no need to defer that, they're closed automatically
+	// defer rows.Close()
 
 	var desc = rows.FieldDescriptions()
 	cols = make([]string, len(desc))

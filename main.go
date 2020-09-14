@@ -101,10 +101,16 @@ func parseArgs() ([]CommandBlock, error) {
 			Name:     name,
 		}
 
-		if srcc, ok := swllib.Sources[name]; ok && isSource {
+		if srcc, keep := swllib.GetSource(name); srcc != nil && isSource {
 			cmd.SrcCreator = srcc.Creator
-		} else if wrcc, ok := swllib.Sinks[name]; ok && !isSource {
+			if keep {
+				cmd.Args = append([]string{name}, cmd.Args...)
+			}
+		} else if wrcc, keep := swllib.GetSink(name); wrcc != nil && !isSource {
 			cmd.SinkCreator = wrcc.Creator
+			if keep {
+				cmd.Args = append([]string{name}, cmd.Args...)
+			}
 		} else {
 			return fmt.Errorf(`Could not find handler for '%s'`, name)
 		}

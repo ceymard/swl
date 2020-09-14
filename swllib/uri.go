@@ -2,10 +2,13 @@ package swllib
 
 import (
 	"fmt"
+	"log"
 	"net"
+	"os/user"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/rgzr/sshtun"
 )
@@ -24,12 +27,13 @@ func (u *TunneledURI) IsTunnel() bool {
 
 // Close is to be called in a defer statement
 func (u *TunneledURI) Close() {
+	// log.Print("closed ", u.ClientURI)
 	if u.tunnel != nil {
-		u.Close()
+		u.tunnel.Stop()
 	}
 }
 
-var reSSHTunnel = regexp.MustCompile(`(?P<original_host>[a-zA-Z0-9.]+):(?::(?P<original_port>\d+))?@@(?P<target_host>[a-zA-Z0-9.])`)
+var reSSHTunnel = regexp.MustCompile(`(?P<original_host>[-_$a-zA-Z0-9.]+)(?::(?P<original_port>\d+))?@@(?P<target_host>[-_a-zA-Z0-9.]+)`)
 
 // HandleURI provides a way to set up a local SSH tunnel before opening a connection
 // We scan the URI for an SSH tunnel and open a connection to it.
@@ -41,6 +45,8 @@ func HandleURI(uri string) (*TunneledURI, error) {
 		host, port, sshhost string
 		remote_port         int
 		free_local_port     int
+		usr                 *user.User
+		wg                  sync.WaitGroup
 		tunnel              *sshtun.SSHTun
 	)
 
@@ -53,13 +59,35 @@ func HandleURI(uri string) (*TunneledURI, error) {
 			return nil, fmt.Errorf(`for uri "%s", could not find available port %w`, uri, err)
 		}
 
-		tunnel = sshtun.New(free_local_port, sshhost, remote_port)
-		tunnel.SetRemoteHost(host)
-		if err = tunnel.Start(); err != nil {
-			return nil, fmt.Errorf(`for uri "%s", failed to open SSH tunnel %w`, uri, err)
+		if usr, err = user.Current(); err != nil {
+			return nil, fmt.Errorf(`for uri "%s", could not get user %w`, uri, err)
 		}
 
-		var final_host = `localhost:` + strconv.Itoa(free_local_port)
+		tunnel = sshtun.New(free_local_port, sshhost, remote_port)
+		wg.Add(1)
+		tunnel.SetRemoteHost(host)
+		tunnel.SetUser(usr.Username) // FIXME
+
+		tunnel.SetConnState(func(tun *sshtun.SSHTun, state sshtun.ConnState) {
+			if state == sshtun.StateStarting {
+				return
+			}
+			tunnel.SetConnState(nil)
+			wg.Done()
+		})
+
+		// How does one wait for the start
+		go func() {
+			err = tunnel.Start()
+			if err != nil {
+				err = fmt.Errorf(`could not start tunnel %w`, err)
+				log.Print(err)
+			}
+		}()
+
+		wg.Wait()
+
+		var final_host = `127.0.0.1:` + strconv.Itoa(free_local_port)
 
 		return &TunneledURI{
 			ClientURI:   strings.Replace(uri, matches[0], final_host, 1),

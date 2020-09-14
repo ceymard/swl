@@ -2,6 +2,8 @@ package swllib
 
 import (
 	"fmt"
+	"path"
+	"regexp"
 	"sync"
 )
 
@@ -139,20 +141,67 @@ type RegisteredSource struct {
 	Creator SourceCreator
 }
 
-var Sources = make(map[string]RegisteredSource)
-
 type RegisteredSink struct {
 	Name    string
 	Help    string
 	Creator SinkCreator
 }
 
-var Sinks = make(map[string]RegisteredSink)
+var Sources = make(map[string]*RegisteredSource)
+var Sinks = make(map[string]*RegisteredSink)
 
-func RegisterSource(name string, help string, cbk SourceCreator) {
-	Sources[name] = RegisteredSource{name, help, cbk}
+func RegisterSource(cbk SourceCreator, help string, names ...string) {
+	for _, name := range names {
+		Sources[name] = &RegisteredSource{name, help, cbk}
+	}
 }
 
-func RegisterSink(name string, help string, cbk SinkCreator) {
-	Sinks[name] = RegisteredSink{name, help, cbk}
+func RegisterSink(cbk SinkCreator, help string, names ...string) {
+	for _, name := range names {
+		Sinks[name] = &RegisteredSink{name, help, cbk}
+	}
+}
+
+var reProto = regexp.MustCompile(`^[-a-zA-Z_]+://`)
+
+func GetSource(pth string) (*RegisteredSource, bool) {
+
+	if reg, ok := Sources[pth]; ok {
+		return reg, false
+	}
+
+	// look for proto://
+	proto := reProto.FindString(pth)
+	if reg, ok := Sources[proto]; ok {
+		return reg, true
+	}
+
+	// lastly, look for extension
+	ext := path.Ext(pth)
+	if reg, ok := Sources[ext]; ok {
+		return reg, true
+	}
+
+	return nil, false
+}
+
+func GetSink(pth string) (*RegisteredSink, bool) {
+
+	if reg, ok := Sinks[pth]; ok {
+		return reg, false
+	}
+
+	// look for proto://
+	proto := reProto.FindString(pth)
+	if reg, ok := Sinks[proto]; ok {
+		return reg, true
+	}
+
+	// lastly, look for extension
+	ext := "." + path.Ext(pth)
+	if reg, ok := Sinks[ext]; ok {
+		return reg, true
+	}
+
+	return nil, false
 }

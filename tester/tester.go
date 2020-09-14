@@ -5,7 +5,7 @@ import (
 )
 
 func init() {
-	swllib.RegisterSource("tester", "tester source", TesterSourceCreator)
+	swllib.RegisterSource(TesterSourceCreator, "tester source", "tester")
 }
 
 func TesterSourceCreator(pipe *swllib.Pipe, args []string) (swllib.Source, error) {
