@@ -3,6 +3,7 @@ package swlite
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/ceymard/swl/swllib"
@@ -119,6 +120,7 @@ func (s *sqliteSink) OnCollectionStart(start *swllib.CollectionStartChunk) (swll
 
 	_, _ = query.WriteString(`)`)
 
+	log.Print(query.String())
 	if err = s.exec(query.String()); err != nil {
 		return nil, err
 	}
@@ -129,7 +131,7 @@ func (s *sqliteSink) OnCollectionStart(start *swllib.CollectionStartChunk) (swll
 
 	// If we need to truncate, to it now.
 	if s.args.Truncate {
-		if err = s.exec(fmt.Sprintf(`DELETE FROM TABLE "%s"`, start.Name)); err != nil {
+		if err = s.exec(fmt.Sprintf(`DELETE FROM "%s"`, start.Name)); err != nil {
 			return nil, err
 		}
 	}

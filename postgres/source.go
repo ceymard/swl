@@ -3,10 +3,11 @@ package pg
 import (
 	"context"
 	"fmt"
-	"strconv"
+	"regexp"
 	"strings"
 
 	"github.com/ceymard/swl/swllib"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 )
 
@@ -90,28 +91,72 @@ func (ps *PostgresSource) Emit() error {
 	return nil
 }
 
+var reNoTransform = regexp.MustCompile(`^(?i)(text|int|float|bool|byte|varchar|char|json|date)`)
+
 func (ps *PostgresSource) HandleCollection(ctx context.Context, client *pgx.Conn, req swllib.SQLTableRequest) error {
 	var (
 		rows      pgx.Rows
 		cols      []string
 		typehints = make(map[string]string)
 		err       error
-		values    []interface{}
+		stmt      *pgconn.StatementDescription
 	)
 
-	if rows, err = client.Query(ctx, fmt.Sprintf(`SELECT row_to_json(T) as res FROM (%s) T`, req.Query)); err != nil {
-		return err
-	}
-	// no need to defer that, they're closed automatically
-	// defer rows.Close()
+	var stmtName = "tmp-stmt-will-be-deleted"
 
-	var desc = rows.FieldDescriptions()
+	// First we create a statement, which we will use to get the type hints.
+	if stmt, err = client.Prepare(ctx, stmtName, req.Query); err != nil {
+		return fmt.Errorf(`could not create statement for '%s' %w`, req.Query, err)
+	}
+
+	var desc = stmt.Fields
+	var json_forced_cols = make([]bool, len(desc))
 	cols = make([]string, len(desc))
 	for i, d := range desc {
 		cols[i] = string(d.Name)
 		// FIXME, we should get the types sometime before...
-		typehints[cols[i]] = "oid::" + strconv.FormatInt(int64(d.DataTypeOID), 10)
+		var tname, ok = client.ConnInfo().DataTypeForOID(desc[i].DataTypeOID)
+		if !ok {
+			typehints[cols[i]] = "JSON"
+			json_forced_cols[i] = true
+			// return fmt.Errorf(`unknown data type OID '%v' for column '%s'`, desc[i].DataTypeOID, d.Name)
+		} else {
+			var name = strings.ToUpper(tname.Name)
+			if !reNoTransform.MatchString(name) {
+				json_forced_cols[i] = true
+				typehints[cols[i]] = "JSON"
+			} else {
+				typehints[cols[i]] = name
+			}
+		}
 	}
+
+	// Release the statement, as we're going to handle the rows as json instead
+	if err = client.Deallocate(ctx, stmtName); err != nil {
+		return err
+	}
+
+	// wrap the query into some beautiful json stuff
+	var builder swllib.Buffer
+	builder.WriteStrings(`SELECT `)
+
+	for i := range cols {
+		if i > 0 {
+			builder.WriteString(`, `)
+		}
+		if json_forced_cols[i] {
+			builder.WriteStrings(`row_to_json(R)->'`, cols[i], `' as "`, cols[i], `"`)
+		} else {
+			builder.WriteStrings(cols[i])
+		}
+	}
+
+	builder.WriteStrings(` FROM (`, req.Query, `) R`)
+
+	if rows, err = client.Query(ctx, builder.String()); err != nil {
+		return err
+	}
+	defer rows.Close()
 
 	ps.pipe.WriteStartCollection(&swllib.CollectionStartChunk{
 		Name:      req.Colname,
@@ -119,15 +164,44 @@ func (ps *PostgresSource) HandleCollection(ctx context.Context, client *pgx.Conn
 	})
 
 	for rows.Next() {
-		if values, err = rows.Values(); err != nil {
+		// var value interface{}
+
+		// if err = rows.Scan(&value); err != nil {
+		// 	return err
+		// }
+		if err = ps.handleRow(cols, rows); err != nil {
 			return err
 		}
-		if err = ps.pipe.WriteData(values[0].(map[string]interface{})); err != nil {
-			return err
-		}
+
+		// if err = ps.pipe.WriteData(value.(map[string]interface{})); err != nil {
+		// 	return err
+		// }
 	}
 
 	return nil
+}
+
+func (ps *PostgresSource) handleRow(cols []string, rows pgx.Rows) error {
+	var (
+		values = make([]interface{}, len(cols))
+		ptrs   = make([]interface{}, len(cols))
+		dt     = make(map[string]interface{})
+		err    error
+	)
+
+	for i := range cols {
+		ptrs[i] = &values[i]
+		// dt[name] = values[i]
+	}
+	if err = rows.Scan(ptrs...); err != nil {
+		return err
+	}
+	for i, name := range cols {
+		// ptrs[i] = &values[i]
+		dt[name] = values[i]
+	}
+
+	return ps.pipe.WriteData(dt)
 }
 
 func (ps *PostgresSource) ComputeAllTables(ctx context.Context, client *pgx.Conn) ([]swllib.SQLTableRequest, error) {

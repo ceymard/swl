@@ -38,6 +38,10 @@ func (d *debugSink) OnError(err error) {
 // OnCollectionStart .
 func (d *debugSink) OnCollectionStart(start *swllib.CollectionStartChunk) (swllib.CollectionHandler, error) {
 	d.col = start.Name
+	cy.Print(d.col, ` typehints `)
+	pretty(start.TypeHints)
+	_, _ = fmt.Print("\n")
+
 	// pp.Print(start.TypeHints)
 	return d, nil
 }
