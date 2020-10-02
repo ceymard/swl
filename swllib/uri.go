@@ -111,6 +111,10 @@ func HandleURI(uri string) (*TunneledURI, error) {
 			tunnel.SetUser(usr.Username)
 		}
 
+		if cfgKeyFile, err := cfg.Get(sshhost, "IdentityFile"); err == nil {
+			tunnel.SetKeyFile(cfgKeyFile)
+		}
+
 		tunnel.SetRemoteHost(host)
 
 		tunnel.SetConnState(func(tun *sshtun.SSHTun, state sshtun.ConnState) {
