@@ -1,8 +1,10 @@
 package swlite
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/alecthomas/kong"
 	"github.com/ceymard/swl/swllib"
 
 	"database/sql"
@@ -23,7 +25,7 @@ func init() {
 type sqliteSourceArgs struct {
 	URI     string   `arg required type:'path'`
 	Sources []string `arg optional`
-	Coerce  bool
+	Json    bool     `help:"interpret string values starting by [ or { as json"`
 }
 
 // The SQLite source for swl
@@ -35,7 +37,7 @@ func sqliteSourceCreator(pipe *swllib.Pipe, args []string) (swllib.Source, error
 	)
 
 	cli := sqliteSourceArgs{}
-	if err = swllib.ParseArgs(&cli, args); err != nil {
+	if err = swllib.ParseArgs(&cli, args, kong.Name("sqlite")); err != nil {
 		return nil, err
 	}
 
@@ -49,13 +51,14 @@ func sqliteSourceCreator(pipe *swllib.Pipe, args []string) (swllib.Source, error
 		req = swllib.ParseSQLTableRequests(cli.Sources)
 	}
 
-	return &sqliteSource{pipe, db, req}, nil
+	return &sqliteSource{pipe, db, req, cli}, nil
 }
 
 type sqliteSource struct {
 	pipe   *swllib.Pipe
 	conn   *sql.DB
 	tables []swllib.SQLTableRequest
+	args   sqliteSourceArgs
 }
 
 // Returns a list of table or views to be queried by default
@@ -145,6 +148,20 @@ func (s *sqliteSource) processTable(tbl swllib.SQLTableRequest) error {
 		if m, err = swllib.SqlRowsToMap(cols, rows); err != nil {
 			return err
 		}
+
+		if s.args.Json {
+			for _, c := range cols {
+				var val = m[c]
+				if str, ok := val.(string); ok && len(str) > 0 && (str[0] == '{' || str[0] == '[') {
+					// possibly a json value, we will try to decode it
+					var jsonval []interface{}
+					if err := json.Unmarshal([]byte(str), &jsonval); err == nil {
+						m[c] = jsonval
+					}
+				}
+			}
+		}
+
 		// Outputs: map[columnName:value columnName2:value2 columnName3:value3 ...]
 		if err = s.pipe.WriteData(m); err != nil {
 			return err

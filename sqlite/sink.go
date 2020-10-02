@@ -2,8 +2,9 @@ package swlite
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	"log"
+	"reflect"
 	"strings"
 
 	"github.com/ceymard/swl/swllib"
@@ -120,7 +121,7 @@ func (s *sqliteSink) OnCollectionStart(start *swllib.CollectionStartChunk) (swll
 
 	_, _ = query.WriteString(`)`)
 
-	log.Print(query.String())
+	// log.Print(query.String())
 	if err = s.exec(query.String()); err != nil {
 		return nil, err
 	}
@@ -168,19 +169,47 @@ type sqliteColHandler struct {
 }
 
 func (ch *sqliteColHandler) OnData(data swllib.Data, _ uint) error {
-	var args = make([]interface{}, len(ch.columns))
+	var (
+		args  = make([]interface{}, len(ch.columns))
+		bytes []byte
+		err   error
+	)
 	for i, c := range ch.columns {
 		if val, ok := data[c]; ok {
+			if !isNilFixed(val) {
+				var rt = reflect.TypeOf(val)
+				var kind = rt.Kind()
+				if kind == reflect.Slice || kind == reflect.Map {
+
+					if bytes, err = json.Marshal(val); err != nil {
+						return fmt.Errorf(`unable to convert %v to json %w`, val, err)
+					}
+					args[i] = string(bytes)
+					continue
+				}
+			}
+
 			args[i] = val
 		}
 	}
 	// transform data into []interface{}.
 	// this should be done by knowing columns...
-	_, err := ch.stmt.Exec(args... /* ... */)
+	_, err = ch.stmt.Exec(args... /* ... */)
 	return err
 }
 
 func (ch *sqliteColHandler) OnEnd() error {
 	// Close the statement.
 	return ch.stmt.Close()
+}
+
+func isNilFixed(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	switch reflect.TypeOf(i).Kind() {
+	case reflect.Ptr, reflect.Map, reflect.Array, reflect.Chan, reflect.Slice:
+		return reflect.ValueOf(i).IsNil()
+	}
+	return false
 }

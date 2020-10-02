@@ -4,14 +4,36 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/user"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/kevinburke/ssh_config"
 	"github.com/rgzr/sshtun"
 )
+
+var cfg *ssh_config.Config
+
+// Read the user's ssh config
+func init() {
+	var (
+		err error
+		f   *os.File
+	)
+
+	if f, err = os.Open(filepath.Join(os.Getenv("HOME"), ".ssh", "config")); err != nil {
+		return
+	}
+
+	if cfg, err = ssh_config.Decode(f); err != nil {
+		return
+	}
+
+}
 
 // TunneledURI represents a URI that may be tunneled through SSH
 type TunneledURI struct {
@@ -41,18 +63,23 @@ var reSSHTunnel = regexp.MustCompile(`(?P<original_host>[-_$a-zA-Z0-9.]+)(?::(?P
 func HandleURI(uri string) (*TunneledURI, error) {
 
 	var (
-		err                 error
-		host, port, sshhost string
-		remote_port         int
-		free_local_port     int
-		usr                 *user.User
-		wg                  sync.WaitGroup
-		tunnel              *sshtun.SSHTun
+		err                              error
+		host, port, sshhost, sshhostconn string
+		remote_port                      int
+		free_local_port                  int
+		usr                              *user.User
+		wg                               sync.WaitGroup
+		tunnel                           *sshtun.SSHTun
 	)
 
 	var matches = reSSHTunnel.FindStringSubmatch(uri)
 	if matches != nil {
+		if cfg == nil {
+			panic("no ssh config file found")
+		}
+
 		host, port, sshhost = matches[1], matches[2], matches[3]
+
 		remote_port, _ = strconv.Atoi(port) // regexp specifies \d, this cannot fail
 
 		if free_local_port, err = getFreePort(); err != nil {
@@ -63,10 +90,28 @@ func HandleURI(uri string) (*TunneledURI, error) {
 			return nil, fmt.Errorf(`for uri "%s", could not get user %w`, uri, err)
 		}
 
-		tunnel = sshtun.New(free_local_port, sshhost, remote_port)
+		if cfgHost, err := cfg.Get(sshhost, "HostName"); err == nil {
+			sshhostconn = cfgHost
+		} else {
+			sshhostconn = sshhost
+		}
+
+		tunnel = sshtun.New(free_local_port, sshhostconn, remote_port)
 		wg.Add(1)
+
+		if cfgPort, err := cfg.Get(sshhost, "Port"); err == nil {
+			if intPort, err := strconv.Atoi(cfgPort); err == nil {
+				tunnel.SetPort(intPort)
+			}
+		}
+
+		if cfgUser, err := cfg.Get(sshhost, "User"); err == nil {
+			tunnel.SetUser(cfgUser)
+		} else {
+			tunnel.SetUser(usr.Username)
+		}
+
 		tunnel.SetRemoteHost(host)
-		tunnel.SetUser(usr.Username) // FIXME
 
 		tunnel.SetConnState(func(tun *sshtun.SSHTun, state sshtun.ConnState) {
 			if state == sshtun.StateStarting {
