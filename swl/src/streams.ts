@@ -75,11 +75,12 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
   readable = new Lock()
   drained = new Lock()
 
-  constructor(public stream: T, public collection?: string) {
+  constructor(public stream: T, public collection?: string, is_read: boolean = false) {
     // FIXME - should check if stream isn't writable to be sure
-    // stream.on('readable', e => {
-    //   this.readable.resolve()
-    // })
+    if (is_read)
+      stream.on('readable', e => {
+        this.readable.resolve()
+      })
     stream.on('end', e => {
       this._ended = true
       this.ended.resolve()

@@ -29,7 +29,7 @@ export class CsvSource extends Source<
     const sources = await make_read_creator(await this.body[0], this.body[1] || {}, this.options.name || undefined)
 
     for await (var src of sources) {
-      const stream = new StreamWrapper(src.source.pipe(parse(this.options)))
+      const stream = new StreamWrapper(src.source.pipe(parse(this.options)), src.collection, true)
       var value: any
       while ( (value = await stream.read()) !== null ) {
         await this.send(Chunk.data(src.collection, value))
