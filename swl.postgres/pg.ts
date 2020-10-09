@@ -3,7 +3,7 @@ import {Sequence, Chunk, s, Sink, URI, OPT_OBJECT, StreamWrapper, Source, Parser
 import * as pg from 'pg'
 import * as _ from 'csv-stringify'
 const copy_from = require('pg-copy-streams').from
-import * as st from 'stream'
+// import * as st from 'stream'
 
 var types = pg.types
 // Data type !
@@ -135,7 +135,7 @@ export class PgSink extends Sink<
   wr: StreamWrapper<NodeJS.WritableStream> | null = null
   db!: pg.Client
   columns!: string[]
-  columns_str!: string
+  // columns_str!: string
 
   async init() {
     const db = new pg.Client(`postgres://${await this.body}`)
@@ -198,64 +198,55 @@ export class PgSink extends Sink<
     // command
     await this.db.query(`
       CREATE TEMP TABLE ${table.replace('.', '_')}_temp (
-        ${columns.map((c, i) => `"${c}" TEXT`).join(', ')}
+        jsondata json
       )
     `)
 
-    this.columns_str = columns.map(c => `"${c}"`).join(', ')
+    // this.columns_str = columns.map(c => `"${c}"`).join(', ')
 
     if (this.options.truncate) {
       this.info(`truncating ${table}`)
       await this.db.query(`DELETE FROM ${table}`)
     }
 
-    var stream: NodeJS.WritableStream = await this.db.query(copy_from(`COPY ${table.replace('.', '_')}_temp(${this.columns_str}) FROM STDIN
+    var stream: NodeJS.WritableStream = await this.db.query(copy_from(`COPY ${table.replace('.', '_')}_temp(jsondata) FROM STDIN
     WITH
-    DELIMITER AS ';'
-    CSV HEADER
-    QUOTE AS '"'
-    ESCAPE AS '"'
     NULL AS '**NULL**'`)) as any
 
-    var csv: NodeJS.ReadWriteStream = _({
-      delimiter: ';',
-      header: true,
-      quote: '"',
-      // escape: true
-    })
+    // var csv: NodeJS.ReadWriteStream = _({
+    //   delimiter: ';',
+    //   header: true,
+    //   quote: '"',
+    //   // escape: true
+    // })
 
-    const tr = new st.Transform({
-      transform: (chunk, enc, callbak) => {
-        console.log(chunk)
-        callbak(chunk)
-      }
-    })
-    csv.pipe(stream)
+    // csv.pipe(stream)
     // tr.on('data', e => console.log('pouet'))
     // csv.write({zob: 1, sds: 2, dfdf:2})
 
     // console.log(stream.writable)
-    this.wr = new StreamWrapper(csv)
+    this.wr = new StreamWrapper(stream)
   }
 
   async onData(chunk: Chunk.Data) {
     // console.log(chunk)
-    var data = {} as any
-    var p = chunk.payload
-    for (var x in p) {
-      const val = p[x]
-      if (val === null)
-        data[x] = '**NULL**'
-      else if (val instanceof Date)
-        data[x] = val!.toUTCString()
-      else if (val instanceof Array)
-        data[x] = '{' + val.join(',') + '}'
-      else if (val.constructor === Object)
-        data[x] = JSON.stringify(val)
-      else
-        data[x] = val.toString()
-    }
-    await this.wr!.write(data)
+    // var data = {} as any
+    // var p = chunk.payload
+    // for (var x in p) {
+    //   const val = p[x]
+    //   if (val === null)
+    //     data[x] = '**NULL**'
+    //   else if (val instanceof Date)
+    //     data[x] = val!.toUTCString()
+    //   else if (val instanceof Array)
+    //     data[x] = '{' + val.join(',') + '}'
+    //   else if (val.constructor === Object)
+    //     data[x] = JSON.stringify(val)
+    //   else
+    //     data[x] = val.toString()
+    // }
+    // console.log(JSON.stringify(chunk.payload))
+    await this.wr!.write(JSON.stringify(chunk.payload) + '\n')
   }
 
   async onCollectionEnd(table: string) {
@@ -272,15 +263,15 @@ export class PgSink extends Sink<
       [schema, tbl] = table.split('.')
     }
 
-    const db_cols = (await this.db.query(/* sql */`
-    select json_object_agg(column_name, udt_name) as res
-    from information_schema.columns
-    where table_name = '${tbl}' AND table_schema = '${schema}'
-    `)).rows[0].res as {[name: string]: string}
+    // const db_cols = (await this.db.query(/* sql */`
+    // select json_object_agg(column_name, udt_name) as res
+    // from information_schema.columns
+    // where table_name = '${tbl}' AND table_schema = '${schema}'
+    // `)).rows[0].res as {[name: string]: string}
 
-    const expr = this.columns.map(c => `"${c}"::${db_cols[c]}`)
-    .join(', ') // .replace(/timestamp(tz)?/g, 'long::abstime')
-    // this.info(expr)
+    // const expr = this.columns.map(c => `"${c}"::${db_cols[c]}`)
+    // .join(', ') // .replace(/timestamp(tz)?/g, 'long::abstime')
+    // // this.info(expr)
 
     var upsert = ""
     if (this.options.upsert) {
@@ -307,10 +298,10 @@ export class PgSink extends Sink<
     this.info(`inserting data from ${table.replace('.', '_')}_temp`)
 
     // Insert data from temp table into final table
-    // console.log((await this.db.query(`SELECT * FROM ${table.replace('.', '_')}_temp`)).rows)
+    // console.log((await this.db.query(`SELECT ${this.columns.join(', ')} FROM json_populate_recordset(null::${table}, (SELECT json_agg(jsondata) FROM ${table.replace('.', '_')}_temp))`)).rows)
 
     await this.db.query(`
-      INSERT INTO ${table}(${this.columns_str}) (SELECT ${expr} FROM ${table.replace('.', '_')}_temp)
+      INSERT INTO ${table}(${this.columns.join(', ')}) (SELECT ${this.columns.join(', ')} FROM json_populate_recordset(null::${table}, (SELECT json_agg(jsondata) FROM ${table.replace('.', '_')}_temp)) )
       ${upsert}
     `)
 
