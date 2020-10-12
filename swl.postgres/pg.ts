@@ -298,10 +298,18 @@ export class PgSink extends Sink<
     this.info(`inserting data from ${table.replace('.', '_')}_temp`)
 
     // Insert data from temp table into final table
-    // console.log((await this.db.query(`SELECT ${this.columns.join(', ')} FROM json_populate_recordset(null::${table}, (SELECT json_agg(jsondata) FROM ${table.replace('.', '_')}_temp))`)).rows)
+    // console.log((await this.db.query(`
+    //   SELECT ${this.columns.map(c => 'R.' + c).join(', ')}
+    //     FROM ${table.replace('.', '_')}_temp T,
+    //       json_populate_record(null::${table}, T.jsondata) R
+    //   `)).rows)
 
     await this.db.query(`
-      INSERT INTO ${table}(${this.columns.join(', ')}) (SELECT ${this.columns.join(', ')} FROM json_populate_recordset(null::${table}, (SELECT json_agg(jsondata) FROM ${table.replace('.', '_')}_temp)) )
+      INSERT INTO ${table}(${this.columns.join(', ')}) (
+        SELECT ${this.columns.map(c => 'R.' + c).join(', ')}
+        FROM ${table.replace('.', '_')}_temp T,
+          json_populate_record(null::${table}, T.jsondata) R
+      )
       ${upsert}
     `)
 
