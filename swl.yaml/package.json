@@ -1,0 +1,15 @@
+{
+  "name": "swl.yaml",
+  "version": "0.0.1",
+  "main": "yaml.js",
+  "types": "yaml.d.ts",
+  "scripts": {
+    "watch": "wtsc -w",
+    "build": "wtsc"
+  },
+  "devDependencies": {},
+  "dependencies": {
+    "@types/js-yaml": "^3.12.5",
+    "js-yaml": "^3.14.0"
+  }
+}

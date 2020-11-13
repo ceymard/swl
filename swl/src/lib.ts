@@ -25,7 +25,7 @@ function try_require(...names: string[]) {
 try_require(
   'swl.json',
   'swl.csv',
-  // 'swl.yaml',
+  'swl.yaml',
   'swl.postgres',
   'swl.sqlite',
   // 'swl.imap',
