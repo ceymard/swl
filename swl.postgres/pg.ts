@@ -229,22 +229,6 @@ export class PgSink extends Sink<
   }
 
   async onData(chunk: Chunk.Data) {
-    // console.log(chunk)
-    // var data = {} as any
-    // var p = chunk.payload
-    // for (var x in p) {
-    //   const val = p[x]
-    //   if (val === null)
-    //     data[x] = '**NULL**'
-    //   else if (val instanceof Date)
-    //     data[x] = val!.toUTCString()
-    //   else if (val instanceof Array)
-    //     data[x] = '{' + val.join(',') + '}'
-    //   else if (val.constructor === Object)
-    //     data[x] = JSON.stringify(val)
-    //   else
-    //     data[x] = val.toString()
-    // }
     await this.wr!.write(JSON.stringify(chunk.payload).replace(/\\/g, '\\\\').replace(/\|/, '\\|') + '\n')
   }
 
