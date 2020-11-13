@@ -211,7 +211,7 @@ export class PgSink extends Sink<
 
     var stream: NodeJS.WritableStream = await this.db.query(copy_from(`COPY ${table.replace('.', '_')}_temp(jsondata) FROM STDIN
     WITH
-    NULL AS '**NULL**'`)) as any
+    (NULL '**NULL**', DELIMITER '|')`)) as any
 
     // var csv: NodeJS.ReadWriteStream = _({
     //   delimiter: ';',
@@ -245,8 +245,7 @@ export class PgSink extends Sink<
     //   else
     //     data[x] = val.toString()
     // }
-    // console.log(JSON.stringify(chunk.payload))
-    await this.wr!.write(JSON.stringify(chunk.payload) + '\n')
+    await this.wr!.write(JSON.stringify(chunk.payload).replace(/\\/g, '\\\\').replace(/\|/, '\\|') + '\n')
   }
 
   async onCollectionEnd(table: string) {
