@@ -1,7 +1,7 @@
 
 import {Sequence, OPT_OBJECT, URI, s, Chunk, Source, register, ParserType, Sink } from 'swl'
 import { readFileSync, writeFileSync } from 'fs'
-import { safeDump, safeLoad } from 'js-yaml'
+import { safeDump, load } from 'js-yaml'
 
 
 const YAML_SOURCE_OPTIONS = s.object({
@@ -39,12 +39,35 @@ export class YamlSource extends Source<
   async emit() {
     // console.log(this.filename)
     const contents = readFileSync(this.filename, 'utf-8')
-    const parsed: object | any[] = safeLoad(contents, { filename: this.filename, }) as any
+    const parsed: object | any[] = load(contents, { filename: this.filename, }) as any
 
 
+    var acc: {[name: string]: any[]} = {}
     for (const [col, cts] of Object.entries(parsed)) {
+      const is_ref = col === '__refs__'
+
+      var _coll: any[] = acc[col] = []
+
       for (var obj of cts) {
-        await this.send(Chunk.data(col, obj))
+        if (typeof obj === 'function') {
+          const objs: any[] = []
+          obj(acc, function (obj: any) { objs.push(obj) })
+          if (objs.length) {
+            for (var ob of objs) {
+              _coll.push(ob)
+              if (!is_ref) {
+                const { __meta__, ...to_send } = ob
+                await this.send(Chunk.data(col, to_send))
+              }
+            }
+          }
+        } else {
+          _coll.push(obj)
+          if (!is_ref) {
+            const { __meta__, ...ob } = obj
+            await this.send(Chunk.data(col, ob))
+          }
+        }
       }
     }
     this.info('done')
