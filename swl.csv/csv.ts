@@ -32,6 +32,11 @@ export class CsvSource extends Source<
       const stream = new StreamWrapper(src.source.pipe(parse(this.options)), src.collection, true)
       var value: any
       while ( (value = await stream.read()) !== null ) {
+        for (var x in value) {
+          if (value[x] == null) {
+            value[x] = null
+          }
+        }
         await this.send(Chunk.data(src.collection, value))
       }
     }

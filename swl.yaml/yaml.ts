@@ -44,7 +44,10 @@ export class YamlSource extends Source<
 
     var acc: {[name: string]: any[]} = {}
     for (const [col, cts] of Object.entries(parsed)) {
-      const is_ref = col === '__refs__'
+      if (col === '__refs__') {
+        acc.__refs__ = cts
+        continue
+      }
 
       var _coll: any[] = acc[col] = []
 
@@ -55,18 +58,14 @@ export class YamlSource extends Source<
           if (objs.length) {
             for (var ob of objs) {
               _coll.push(ob)
-              if (!is_ref) {
-                const { __meta__, ...to_send } = ob
-                await this.send(Chunk.data(col, to_send))
-              }
+              const { __meta__, ...to_send } = ob
+              await this.send(Chunk.data(col, to_send))
             }
           }
         } else {
           _coll.push(obj)
-          if (!is_ref) {
-            const { __meta__, ...ob } = obj
-            await this.send(Chunk.data(col, ob))
-          }
+          const { __meta__, ...ob } = obj
+          await this.send(Chunk.data(col, ob))
         }
       }
     }
