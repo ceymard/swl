@@ -13,4 +13,5 @@ require (
 	github.com/mattn/go-colorable v0.1.7 // indirect
 	github.com/mattn/go-sqlite3 v1.14.3
 	github.com/rgzr/sshtun v0.0.2
+	github.com/tzzzoz/monkey v0.0.0-20131023115741-184b7a498d7d // indirect
 )

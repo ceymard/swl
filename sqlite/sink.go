@@ -111,11 +111,11 @@ func (s *sqliteSink) OnCollectionStart(start *swllib.CollectionStartChunk) (swll
 	// Get the hints
 	i := 0
 	for k, v := range start.TypeHints {
-		columns[i] = k
+		columns[i] = "\"" + k + "\""
 		if i > 0 {
 			_ = query.WriteStrings(", ")
 		}
-		_ = query.WriteStrings(k, " ", v)
+		_ = query.WriteStrings("\"", k, "\" ", v)
 		i++
 	}
 
