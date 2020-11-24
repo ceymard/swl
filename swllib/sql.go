@@ -25,10 +25,10 @@ func ParseSQLTableRequests(args []string) []SQLTableRequest {
 			s = parts[0]
 			query = parts[1]
 			if strings.Index(strings.ToLower(strings.TrimSpace(query)), "select") != 0 {
-				query = fmt.Sprintf(`SELECT * FROM "%s"`, query)
+				query = fmt.Sprintf(`SELECT * FROM %s`, query)
 			}
 		} else {
-			query = fmt.Sprintf(`SELECT * FROM "%s"`, query)
+			query = fmt.Sprintf(`SELECT * FROM %s`, query)
 		}
 
 		res = append(res, SQLTableRequest{
