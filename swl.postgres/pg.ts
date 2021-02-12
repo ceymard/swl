@@ -169,6 +169,9 @@ export class PgSink extends Sink<
     try {
       if (this.db) await this.db.query('ROLLBACK')
     } finally {
+      if (err.where) {
+        console.error(err.where)
+      }
       throw err
     }
   }
@@ -211,7 +214,7 @@ export class PgSink extends Sink<
 
     var stream: NodeJS.WritableStream = await this.db.query(copy_from(`COPY ${table.replace('.', '_')}_temp(jsondata) FROM STDIN
     WITH
-    (NULL '**NULL**', DELIMITER '|')`)) as any
+    (NULL '**NULL**', DELIMITER '|', FORMAT csv, QUOTE '@')`)) as any
 
     // var csv: NodeJS.ReadWriteStream = _({
     //   delimiter: ';',
@@ -229,7 +232,8 @@ export class PgSink extends Sink<
   }
 
   async onData(chunk: Chunk.Data) {
-    await this.wr!.write(JSON.stringify(chunk.payload).replace(/\\/g, '\\\\').replace(/\|/, '\\|') + '\n')
+    // console.log(chunk)
+    await this.wr!.write('@' + JSON.stringify(chunk.payload).replace(/@/g, '@@') + '@\n')
   }
 
   async onCollectionEnd(table: string) {
@@ -280,16 +284,9 @@ export class PgSink extends Sink<
 
     this.info(`inserting data from ${table.replace('.', '_')}_temp`)
 
-    // Insert data from temp table into final table
-    // console.log((await this.db.query(`
-    //   SELECT ${this.columns.map(c => 'R.' + c).join(', ')}
-    //     FROM ${table.replace('.', '_')}_temp T,
-    //       json_populate_record(null::${table}, T.jsondata) R
-    //   `)).rows)
-
     await this.db.query(`
-      INSERT INTO ${table}(${this.columns.join(', ')}) (
-        SELECT ${this.columns.map(c => 'R.' + c).join(', ')}
+      INSERT INTO ${table}(${this.columns.map(c => `"${c}"`).join(', ')}) (
+        SELECT ${this.columns.map(c => 'R."' + c + '"').join(', ')}
         FROM ${table.replace('.', '_')}_temp T,
           json_populate_record(null::${table}, T.jsondata) R
       )
