@@ -86,6 +86,10 @@ export class StreamWrapper<T extends NodeJS.ReadableStream | NodeJS.WritableStre
       this.ended.resolve()
       this.readable.resolve()
     })
+    stream.on('finish', e => {
+      this._ended = true
+      this.ended.resolve()
+    })
     stream.on('drain', e => {
       this.drained.resolve()
     })
