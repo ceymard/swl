@@ -9,7 +9,8 @@
   },
   "devDependencies": {},
   "dependencies": {
-    "@types/js-yaml": "^3.12.5",
-    "js-yaml": "^3.14.0"
+    "@types/js-yaml": "^4.0.1",
+    "js-yaml": "^4.1.0",
+    "js-yaml-js-types": "^1.0.0"
   }
 }

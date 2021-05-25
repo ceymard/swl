@@ -38,7 +38,7 @@ export function print_value(out: NodeJS.WritableStream, obj: any, outside = true
     out.write(bool(obj as any))
   } else if (obj instanceof Date) {
     out.write(date(fmt.format(obj)))
-  } else if (obj instanceof Array) {
+  } else if (Array.isArray(obj)) {
     out.write('[')
     var first = true
     for (var e of obj) {

@@ -1,7 +1,10 @@
 
 import {Sequence, OPT_OBJECT, URI, s, Chunk, Source, register, ParserType, Sink } from 'swl'
 import { readFileSync, writeFileSync } from 'fs'
-import { safeDump, load } from 'js-yaml'
+import { load, DEFAULT_SCHEMA, Type, dump } from 'js-yaml'
+const t = require('js-yaml-js-types') as any
+
+import { createContext, runInContext } from 'vm'
 
 
 const YAML_SOURCE_OPTIONS = s.object({
@@ -39,8 +42,29 @@ export class YamlSource extends Source<
   async emit() {
     // console.log(this.filename)
     const contents = readFileSync(this.filename, 'utf-8')
-    const parsed: object | any[] = load(contents, { filename: this.filename, }) as any
 
+    let context = {}
+    createContext(context)
+
+    const schema = DEFAULT_SCHEMA.extend([
+      new Type('tag:yaml.org,2002:e', {
+        kind: 'scalar',
+        resolve: () => true,
+        instanceOf: Object,
+        construct: function (data) {
+          let res = runInContext(data, context)
+          // console.log(res)
+          return res
+        },
+        // Not represented since there is no predicate.
+        predicate: () => false,
+        represent: () => undefined,
+      }),
+      ...t.all
+    ])
+
+
+    const parsed: object | any[] = load(contents, { filename: this.filename, schema }) as any
 
     var acc: {[name: string]: any[]} = {}
     for (const [col, cts] of Object.entries(parsed)) {
@@ -103,7 +127,7 @@ export class SqliteSink extends Sink<
   // }
 
   async final() {
-    writeFileSync(this.filename, safeDump(this.acc, { indent: 2, lineWidth: 120, noArrayIndent: true }), 'utf-8')
+    writeFileSync(this.filename, dump(this.acc, { indent: 2, lineWidth: 120, noArrayIndent: true }), 'utf-8')
   }
 
 
